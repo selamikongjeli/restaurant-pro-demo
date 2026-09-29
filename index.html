@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>Restaurant Pro — Démo mobile</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div><div class="brand">Restaurant <span>Pro</span></div><div class="sub">Démo mobile</div></div>
+  <div class="cash">Caisse ouverte</div>
+</header>
+<nav class="tabs">
+  <button class="tab active" data-view="tables">Salle</button>
+  <button class="tab" data-view="takeaway">Emporter</button>
+  <button class="tab" data-view="delivery">Livraison</button>
+</nav>
+<main>
+  <section>
+    <div class="section-head"><h2>Plan de salle</h2><span class="legend">● libre&nbsp;&nbsp;● occupée</span></div>
+    <div id="tables" class="tables"></div>
+  </section>
+  <section class="catalog">
+    <div id="categories" class="categories"></div>
+    <div id="products" class="products"></div>
+  </section>
+</main>
+<aside id="cartSheet" class="sheet">
+  <div class="handle"></div>
+  <div class="sheet-head"><div><h2>Commande</h2><div id="context" class="muted">Choisissez une table</div></div><button id="closeSheet" class="icon">✕</button></div>
+  <div id="orderStatus" class="status hidden"></div>
+  <div id="cart" class="cart"></div>
+  <div class="summary"><div><span>Sous-total</span><b id="subtotal">0,00 €</b></div><div class="total"><span>TOTAL</span><b id="total">0,00 €</b></div></div>
+  <div class="actions">
+    <button id="sendBtn" class="primary">📤 Envoyer commande</button>
+    <button id="splitBtn">🧾 Séparer note</button>
+    <button id="transferBtn">🔄 Transférer table</button>
+  </div>
+  <div class="paymethods">
+    <button class="pay active" data-method="card">💳 Carte</button>
+    <button class="pay" data-method="cash">💶 Espèces</button>
+    <button class="pay" data-method="meal">🍽️ Chèque-repas</button>
+  </div>
+  <button id="payBtn" class="paybtn" disabled>PAYER 0,00 €</button>
+</aside>
+<button id="openCart" class="floating-cart"><span>Commande</span><b id="floatingTotal">0,00 €</b></button>
+<div id="modal" class="modal hidden"><div class="modal-card"><div class="modal-head"><h3 id="modalTitle"></h3><button id="modalClose" class="icon">✕</button></div><div id="modalBody"></div></div></div>
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
