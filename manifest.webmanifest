@@ -1,9 +1,9 @@
 {
-  "name": "Restaurant Pro Démo",
+  "name": "Restaurant Pro v2.11 Démo",
   "short_name": "Restaurant Pro",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#f3f4f6",
+  "background_color": "#f4f5f7",
   "theme_color": "#111827",
   "icons": []
 }

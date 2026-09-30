@@ -4,50 +4,173 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
-<title>Restaurant Pro — Démo mobile</title>
+<title>Restaurant Pro v2.11 — Démo GitHub</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="brand big">Restaurant <span>Pro</span></div>
+    <p>Démo GitHub Pages</p>
+    <input id="loginUser" placeholder="Utilisateur" value="admin">
+    <input id="loginPin" type="password" placeholder="PIN" value="3333">
+    <button id="loginBtn" class="primary full">Connexion</button>
+    <div class="demo-logins">admin / 3333 · manager / 2222 · serveur / 1111</div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
 <header class="topbar">
-  <div><div class="brand">Restaurant <span>Pro</span></div><div class="sub">Démo mobile</div></div>
-  <div class="cash">Caisse ouverte</div>
+  <div>
+    <div class="brand">Restaurant <span>Pro</span></div>
+    <div class="sub">v2.11 · Démo gratuite GitHub Pages</div>
+  </div>
+  <div class="top-actions">
+    <span id="cashBadge" class="badge closed">Caisse fermée</span>
+    <span id="userBadge" class="badge"></span>
+    <button id="logoutBtn" class="icon">⎋</button>
+  </div>
 </header>
-<nav class="tabs">
-  <button class="tab active" data-view="tables">Salle</button>
-  <button class="tab" data-view="takeaway">Emporter</button>
-  <button class="tab" data-view="delivery">Livraison</button>
+
+<nav class="mainnav">
+  <button class="navbtn active" data-page="pos">Caisse</button>
+  <button class="navbtn" data-page="reservations">Réservations</button>
+  <button class="navbtn manager-only" data-page="products">Produits</button>
+  <button class="navbtn manager-only" data-page="stock">Stock</button>
+  <button class="navbtn manager-only" data-page="reports">Rapports</button>
+  <button class="navbtn manager-only" data-page="settings">Paramètres</button>
 </nav>
+
 <main>
-  <section>
-    <div class="section-head"><h2>Plan de salle</h2><span class="legend">● libre&nbsp;&nbsp;● occupée</span></div>
-    <div id="tables" class="tables"></div>
-  </section>
-  <section class="catalog">
-    <div id="categories" class="categories"></div>
-    <div id="products" class="products"></div>
-  </section>
+<section id="page-pos" class="page">
+  <div class="pos-toolbar">
+    <div class="modes">
+      <button class="mode active" data-mode="table">Salle</button>
+      <button class="mode" data-mode="takeaway">Emporter</button>
+      <button class="mode" data-mode="delivery">Livraison</button>
+    </div>
+    <div>
+      <button id="openCashBtn" class="secondary manager-only">Ouvrir caisse</button>
+      <button id="closeCashBtn" class="secondary manager-only">Fermer caisse</button>
+    </div>
+  </div>
+
+  <div class="pos-layout">
+    <section class="left-panel">
+      <div id="tablesPanel">
+        <div class="section-title"><h2>Plan de salle</h2><span class="muted">Vert libre · Orange occupée · Bleu réservée</span></div>
+        <div id="tables" class="tables"></div>
+      </div>
+      <div class="catalog">
+        <div id="categories" class="categories"></div>
+        <div id="products" class="products"></div>
+      </div>
+    </section>
+
+    <aside class="order-panel">
+      <div class="order-head">
+        <div><h2>Commande</h2><div id="orderContext" class="muted">Choisissez une table</div></div>
+        <button id="clearCartBtn" class="icon">🗑</button>
+      </div>
+      <div id="orderStatus" class="status hidden"></div>
+      <div id="cart" class="cart"></div>
+      <div class="summary">
+        <div><span>Sous-total</span><b id="subtotal">0,00 €</b></div>
+        <div class="total"><span>TOTAL</span><b id="total">0,00 €</b></div>
+      </div>
+      <div class="order-actions">
+        <button id="sendOrderBtn" class="primary">📤 Envoyer commande</button>
+        <button id="splitBillBtn">🧾 Séparer note</button>
+        <button id="transferTableBtn">🔄 Transférer table</button>
+      </div>
+      <div class="paymethods">
+        <button class="pay active" data-pay="card">💳 Carte</button>
+        <button class="pay" data-pay="cash">💶 Espèces</button>
+        <button class="pay" data-pay="meal">🍽️ Chèque-repas</button>
+      </div>
+      <button id="payBtn" class="paybtn" disabled>PAYER 0,00 €</button>
+    </aside>
+  </div>
+</section>
+
+<section id="page-reservations" class="page hidden">
+  <div class="reservation-head">
+    <div>
+      <h1>Réservations</h1>
+      <div id="reservationEstablishmentName" class="muted">Restaurant Pro</div>
+    </div>
+    <div class="reservation-head-actions">
+      <button id="reservationSettingsBtn" class="secondary manager-only">⚙️ Paramètres</button>
+      <button id="newReservationBtn" class="primary">+ Nouvelle réservation</button>
+    </div>
+  </div>
+
+  <div class="reservation-datebar">
+    <button id="resPrevDayBtn" class="secondary">←</button>
+    <button id="resTodayBtn" class="secondary">Aujourd’hui</button>
+    <input id="reservationDate" type="date">
+    <button id="resNextDayBtn" class="secondary">→</button>
+    <span class="spacer"></span>
+    <input id="reservationSearch" type="search" placeholder="Rechercher nom, téléphone...">
+    <select id="reservationStatusFilter">
+      <option value="all">Tous les statuts</option>
+      <option value="booked">Réservées</option>
+      <option value="arrived">Arrivées</option>
+      <option value="finished">Terminées</option>
+      <option value="no_show">No-show</option>
+      <option value="cancelled">Annulées</option>
+    </select>
+  </div>
+
+  <div id="reservationStats" class="big-stats"></div>
+
+  <div class="reservation-workspace">
+    <aside class="slots-panel">
+      <div class="section-title"><h2>Créneaux</h2><span id="reservationCapacityLabel" class="muted"></span></div>
+      <div id="reservationSlots" class="reservation-slots"></div>
+    </aside>
+    <section class="reservation-list-panel">
+      <div class="section-title"><h2 id="reservationListTitle">Réservations</h2><span id="reservationListCount" class="muted"></span></div>
+      <div id="reservationList" class="reservation-list"></div>
+    </section>
+  </div>
+</section>
+
+<section id="page-products" class="page hidden manager-only">
+  <div class="section-title"><h1>Produits</h1><button id="newProductBtn" class="primary">+ Nouveau produit</button></div>
+  <div id="productsAdmin" class="admin-list"></div>
+</section>
+
+<section id="page-stock" class="page hidden manager-only">
+  <div class="section-title"><h1>Stock</h1><span class="muted">Quantités de démonstration</span></div>
+  <div id="stockList" class="admin-list"></div>
+</section>
+
+<section id="page-reports" class="page hidden manager-only">
+  <div class="section-title"><h1>Rapports</h1><button id="resetDemoBtn" class="dangerbtn">Réinitialiser la démo</button></div>
+  <div id="reportStats" class="big-stats"></div>
+  <div id="vatReport" class="report-card"></div>
+  <div id="paymentsReport" class="report-card"></div>
+</section>
+
+<section id="page-settings" class="page hidden manager-only">
+  <div class="section-title"><h1>Paramètres démo</h1></div>
+  <div class="settings-card">
+    <p>Cette version fonctionne gratuitement dans GitHub Pages et sauvegarde les données uniquement dans ce navigateur.</p>
+    <label>Nom de l’établissement<input id="generalEstablishmentName"></label>
+    <button id="saveGeneralSettingsBtn" class="primary">Enregistrer</button>
+  </div>
+</section>
 </main>
-<aside id="cartSheet" class="sheet">
-  <div class="handle"></div>
-  <div class="sheet-head"><div><h2>Commande</h2><div id="context" class="muted">Choisissez une table</div></div><button id="closeSheet" class="icon">✕</button></div>
-  <div id="orderStatus" class="status hidden"></div>
-  <div id="cart" class="cart"></div>
-  <div class="summary"><div><span>Sous-total</span><b id="subtotal">0,00 €</b></div><div class="total"><span>TOTAL</span><b id="total">0,00 €</b></div></div>
-  <div class="actions">
-    <button id="sendBtn" class="primary">📤 Envoyer commande</button>
-    <button id="splitBtn">🧾 Séparer note</button>
-    <button id="transferBtn">🔄 Transférer table</button>
+</div>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head"><h3 id="modalTitle"></h3><button id="modalClose" class="icon">✕</button></div>
+    <div id="modalBody"></div>
   </div>
-  <div class="paymethods">
-    <button class="pay active" data-method="card">💳 Carte</button>
-    <button class="pay" data-method="cash">💶 Espèces</button>
-    <button class="pay" data-method="meal">🍽️ Chèque-repas</button>
-  </div>
-  <button id="payBtn" class="paybtn" disabled>PAYER 0,00 €</button>
-</aside>
-<button id="openCart" class="floating-cart"><span>Commande</span><b id="floatingTotal">0,00 €</b></button>
-<div id="modal" class="modal hidden"><div class="modal-card"><div class="modal-head"><h3 id="modalTitle"></h3><button id="modalClose" class="icon">✕</button></div><div id="modalBody"></div></div></div>
+</div>
 <div id="toast"></div>
 <script src="app.js"></script>
 </body>
