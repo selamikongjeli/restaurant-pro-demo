@@ -1,3 +1,14 @@
+# Restaurant Pro v2.12 — GitHub Pages
+
+## Changements v2.12
+- bouton **📅 Réservations** bleu et toujours visible dans la caisse ;
+- raccourci flottant Réservations sur tablette/téléphone ;
+- navigation plus grande et tactile ;
+- tables et produits agrandis ;
+- panneau commande plus lisible ;
+- boutons d'envoi et paiement agrandis ;
+- correction du cache/service worker : les anciennes versions GitHub Pages sont supprimées automatiquement.
+
 # Restaurant Pro v2.11 — Démo GitHub Pages gratuite
 
 Cette version fonctionne sans Node.js, sans PowerShell, sans Render et sans PostgreSQL.

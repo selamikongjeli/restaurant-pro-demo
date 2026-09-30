@@ -68,13 +68,19 @@ function setPage(name){
   qsa('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.page===name));
   qsa('.page').forEach(p=>p.classList.add('hidden'));
   qs(`#page-${name}`).classList.remove('hidden');
+  const floating=qs('#floatingReservationsBtn');
+  if(floating)floating.classList.toggle('hidden',name==='reservations');
   if(name==='reservations')renderReservations();
   if(name==='products')renderProductsAdmin();
   if(name==='stock')renderStock();
   if(name==='reports')renderReports();
   if(name==='settings')renderSettings();
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 qsa('.navbtn').forEach(b=>b.onclick=()=>setPage(b.dataset.page));
+qs('#quickReservationsBtn').onclick=()=>setPage('reservations');
+qs('#floatingReservationsBtn').onclick=()=>setPage('reservations');
+
 
 function renderCash(){
   const b=qs('#cashBadge');b.textContent=state.cashOpen?'Caisse ouverte':'Caisse fermée';b.className='badge '+(state.cashOpen?'open':'closed');

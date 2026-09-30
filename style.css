@@ -36,3 +36,184 @@ main{padding:14px}.page{max-width:1500px;margin:0 auto}.section-title{display:fl
 #toast{position:fixed;left:50%;bottom:25px;transform:translateX(-50%) translateY(10px);background:#111827;color:#fff;padding:10px 14px;border-radius:10px;opacity:0;transition:.2s;z-index:100;max-width:90%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 @media(max-width:1100px){.pos-layout{grid-template-columns:1fr}.order-panel{position:static}.reservation-workspace{grid-template-columns:1fr}.big-stats{grid-template-columns:repeat(3,1fr)}.res-card{grid-template-columns:65px 1fr 80px}.res-card .buttons{grid-column:1/-1}.products{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:700px){main{padding:8px}.topbar{align-items:flex-start}.top-actions{flex-wrap:wrap;justify-content:flex-end}.tables{grid-template-columns:repeat(3,1fr)}.products{grid-template-columns:repeat(2,1fr)}.big-stats{grid-template-columns:repeat(2,1fr)}.reservation-datebar .spacer{display:none}.reservation-datebar input[type=search]{width:100%}.form-grid{grid-template-columns:1fr}.span2,.span3{grid-column:auto}.res-card{grid-template-columns:60px 1fr}.res-card>div:nth-child(n+3){grid-column:span 1}.admin-row{grid-template-columns:1fr 1fr}}
+
+
+/* ===== v2.12 : interface caisse tactile + Réservations toujours visible ===== */
+body{font-size:16px}
+.topbar{padding:15px 20px;min-height:72px}
+.brand{font-size:26px}
+.sub{font-size:13px}
+.mainnav{
+  top:72px;
+  padding:11px 16px;
+  gap:10px;
+  box-shadow:0 3px 12px rgba(17,24,39,.05);
+}
+.navbtn{
+  min-height:48px;
+  padding:12px 17px;
+  font-size:15px;
+  border-radius:12px;
+}
+.nav-reservations{
+  background:#eff6ff;
+  color:#1d4ed8;
+  border:2px solid #93c5fd;
+  font-weight:900;
+}
+.nav-reservations.active{
+  background:#1d4ed8;
+  border-color:#1d4ed8;
+  color:#fff;
+}
+main{padding:18px}
+.pos-toolbar{align-items:center;margin-bottom:14px}
+.pos-toolbar-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.mode{
+  min-height:50px;
+  padding:12px 18px;
+  font-size:16px;
+  border-radius:12px;
+}
+.quick-reservation-btn{
+  min-height:52px;
+  border:0;
+  border-radius:13px;
+  padding:12px 20px;
+  background:#2563eb;
+  color:#fff;
+  font-size:16px;
+  font-weight:900;
+  box-shadow:0 6px 16px rgba(37,99,235,.2);
+}
+.quick-reservation-btn:hover{background:#1d4ed8}
+.pos-layout{grid-template-columns:minmax(0,1fr) 460px;gap:16px}
+.left-panel,.order-panel{border-radius:18px;padding:16px}
+.order-panel{
+  position:sticky;
+  top:142px;
+  align-self:start;
+  max-height:calc(100vh - 160px);
+  overflow:auto;
+}
+.section-title h2{font-size:24px}
+.tables{gap:12px}
+.table-btn{
+  min-height:105px;
+  padding:16px;
+  border-radius:16px;
+  font-size:17px;
+  box-shadow:0 1px 3px rgba(17,24,39,.04);
+}
+.table-btn small{display:block;margin-top:6px;font-size:13px}
+.table-btn::after{width:12px;height:12px;right:12px;top:12px}
+.reservation-label{
+  margin-top:8px;
+  font-size:12px;
+  background:#eff6ff;
+  border-radius:8px;
+  padding:5px 7px;
+  width:max-content;
+  max-width:100%;
+}
+.catalog{margin-top:22px}
+.categories{gap:9px;margin-bottom:12px}
+.category{
+  min-height:46px;
+  padding:10px 16px;
+  font-size:15px;
+}
+.products{gap:12px}
+.product{
+  min-height:135px;
+  padding:16px;
+  border-radius:16px;
+  font-size:16px;
+  box-shadow:0 1px 3px rgba(17,24,39,.04);
+}
+.product .price{font-size:22px}
+.product .meta{font-size:12px}
+.order-head h2{font-size:24px}
+.cart{min-height:250px;max-height:460px}
+.cart-item{padding:14px 0}
+.item-top b{font-size:16px}
+.qty button{
+  width:40px;
+  height:40px;
+  font-size:20px;
+  font-weight:900;
+}
+.item-controls select,.item-controls button{
+  min-height:42px;
+  font-size:13px;
+}
+.summary .total{font-size:24px}
+.order-actions button{
+  min-height:50px;
+  font-size:14px;
+}
+.order-actions .primary{
+  min-height:58px;
+  font-size:16px;
+}
+.paymethods{gap:8px}
+.pay{
+  min-height:48px;
+  font-size:13px;
+}
+.paybtn{
+  min-height:60px;
+  font-size:20px;
+  border-radius:14px;
+}
+.floating-reservations{
+  display:none;
+  position:fixed;
+  right:16px;
+  bottom:16px;
+  z-index:70;
+  border:0;
+  border-radius:999px;
+  padding:14px 18px;
+  background:#2563eb;
+  color:#fff;
+  font-weight:900;
+  box-shadow:0 12px 28px rgba(37,99,235,.35);
+}
+.reservation-head h1{font-size:30px}
+.reservation-datebar{padding:12px}
+.reservation-datebar button,
+.reservation-datebar input,
+.reservation-datebar select{min-height:44px}
+.big-stats{gap:12px}
+.stat{padding:15px;border-radius:15px}
+.stat b{font-size:27px}
+.slots-panel,.reservation-list-panel{border-radius:18px;padding:16px}
+.slot{min-height:58px}
+.res-card{padding:13px}
+@media(max-width:1250px){
+  .pos-layout{grid-template-columns:minmax(0,1fr) 400px}
+  .tables{grid-template-columns:repeat(4,1fr)}
+}
+@media(max-width:1000px){
+  .pos-layout{grid-template-columns:1fr}
+  .order-panel{position:static;max-height:none}
+  .floating-reservations{display:block}
+  .tables{grid-template-columns:repeat(4,1fr)}
+}
+@media(max-width:700px){
+  .topbar{min-height:68px;padding:10px 12px}
+  .brand{font-size:21px}
+  .mainnav{top:68px;padding:8px;gap:7px}
+  .navbtn{min-height:44px;padding:9px 12px;font-size:13px}
+  main{padding:8px}
+  .pos-toolbar{align-items:stretch;flex-direction:column}
+  .modes,.pos-toolbar-actions{display:grid;grid-template-columns:repeat(3,1fr)}
+  .pos-toolbar-actions .quick-reservation-btn{grid-column:1/-1}
+  .mode,.quick-reservation-btn{width:100%}
+  .tables{grid-template-columns:repeat(2,1fr)}
+  .table-btn{min-height:96px}
+  .products{grid-template-columns:repeat(2,1fr)}
+  .product{min-height:120px}
+  .floating-reservations{display:block}
+}
