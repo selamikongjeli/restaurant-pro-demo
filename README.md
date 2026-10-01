@@ -1,3 +1,11 @@
+# Restaurant Pro v2.13 — Comptabilité + Facturation
+
+Nouveaux modules : pré-comptabilité, dépenses, fournisseurs, TVA estimée, résultat estimé, export CSV, factures clients et aperçu facture.
+
+Mention visible : **Démo de gestion — non certifiée SCE / Peppol**.
+
+Ces fonctions sont de démonstration et de gestion interne. Elles ne remplacent pas une certification SCE, un flux Peppol officiel ou un logiciel comptable réglementaire.
+
 # Restaurant Pro v2.12 — GitHub Pages
 
 ## Changements v2.12

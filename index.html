@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
-<title>Restaurant Pro v2.12 — Démo GitHub</title>
+<title>Restaurant Pro v2.13 — Démo GitHub</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=212">
+<link rel="stylesheet" href="style.css?v=213">
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
@@ -24,7 +24,7 @@
 <header class="topbar">
   <div>
     <div class="brand">Restaurant <span>Pro</span></div>
-    <div class="sub">v2.12 · Démo gratuite GitHub Pages</div>
+    <div class="sub">v2.13 · Démo gratuite GitHub Pages</div>
   </div>
   <div class="top-actions">
     <span id="cashBadge" class="badge closed">Caisse fermée</span>
@@ -32,6 +32,7 @@
     <button id="logoutBtn" class="icon">⎋</button>
   </div>
 </header>
+<div class="compliance-banner">Démo de gestion — non certifiée SCE / Peppol</div>
 
 <nav class="mainnav">
   <button class="navbtn active" data-page="pos">Caisse</button>
@@ -39,6 +40,8 @@
   <button class="navbtn manager-only" data-page="products">Produits</button>
   <button class="navbtn manager-only" data-page="stock">Stock</button>
   <button class="navbtn manager-only" data-page="reports">Rapports</button>
+  <button class="navbtn manager-only" data-page="accounting">Comptabilité</button>
+  <button class="navbtn manager-only" data-page="invoices">Facturation</button>
   <button class="navbtn manager-only" data-page="settings">Paramètres</button>
 </nav>
 
@@ -155,6 +158,19 @@
   <div id="paymentsReport" class="report-card"></div>
 </section>
 
+
+<section id="page-accounting" class="page hidden manager-only">
+  <div class="section-title"><div><h1>Comptabilité</h1><div class="muted">Pré-comptabilité de gestion — démonstration</div></div><div class="accounting-actions"><button id="newExpenseBtn" class="primary">+ Dépense</button><button id="newSupplierBtn" class="secondary">+ Fournisseur</button><button id="exportAccountingCsvBtn" class="secondary">Exporter CSV</button></div></div>
+  <div class="accounting-toolbar"><label>Période <select id="accountingPeriod"><option value="today">Aujourd’hui</option><option value="month" selected>Ce mois</option><option value="year">Cette année</option><option value="all">Tout</option></select></label></div>
+  <div id="accountingStats" class="big-stats"></div>
+  <div class="accounting-grid"><section class="report-card"><div class="section-title"><h2>Dépenses</h2><span id="expenseCount" class="muted"></span></div><div id="expensesList" class="admin-list"></div></section><section class="report-card"><div class="section-title"><h2>Fournisseurs</h2><span id="supplierCount" class="muted"></span></div><div id="suppliersList" class="admin-list"></div></section></div>
+  <div class="accounting-grid"><section id="accountingVat" class="report-card"></section><section id="accountingCategories" class="report-card"></section></div>
+</section>
+<section id="page-invoices" class="page hidden manager-only">
+  <div class="section-title"><div><h1>Facturation</h1><div class="muted">Factures de démonstration — non Peppol</div></div><button id="newInvoiceBtn" class="primary">+ Nouvelle facture</button></div>
+  <div id="invoiceStats" class="big-stats"></div><div id="invoicesList" class="admin-list"></div>
+</section>
+
 <section id="page-settings" class="page hidden manager-only">
   <div class="section-title"><h1>Paramètres démo</h1></div>
   <div class="settings-card">
@@ -174,6 +190,6 @@
 </div>
 <button id="floatingReservationsBtn" class="floating-reservations">📅 Réservations</button>
 <div id="toast"></div>
-<script src="app.js?v=212"></script>
+<script src="app.js?v=213"></script>
 </body>
 </html>
