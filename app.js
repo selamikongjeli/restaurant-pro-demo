@@ -111,7 +111,7 @@ function renderTables(){
 function selectTable(t){
   state.currentMode='table';state.tableId=t.id;
   const open=state.openOrders[t.id];
-  state.cart=open?structuredClone(open.items):[];
+  state.cart=open?consolidateCart(structuredClone(open.items)):[];
   state.sent=!!open;state.dirty=false;
   qsa('.mode').forEach(b=>b.classList.toggle('active',b.dataset.mode==='table'));
   save();renderTables();renderContext();renderCart()
@@ -137,13 +137,85 @@ function renderProducts(){
     b.onclick=()=>addProduct(p);w.appendChild(b)
   })
 }
+
+function cartSegments(items){
+  const segments=[];
+  let current=[];
+  items.forEach(item=>{
+    current.push({...item});
+    if(item.separatorAfter){
+      segments.push(current);
+      current=[];
+    }
+  });
+  if(current.length)segments.push(current);
+  return segments;
+}
+function mergeSegmentItems(segment){
+  const merged=[];
+  const byKey=new Map();
+  segment.forEach(item=>{
+    // Un même article est regroupé seulement s'il appartient au même service.
+    // Cela évite de mélanger un article placé volontairement dans un autre service.
+    const key=`${item.id}|${item.service||''}|${item.station||''}|${item.price}`;
+    if(byKey.has(key)){
+      const target=byKey.get(key);
+      target.qty=Number(target.qty||0)+Number(item.qty||0);
+    }else{
+      const copy={...item,qty:Number(item.qty||1),separatorAfter:false};
+      merged.push(copy);
+      byKey.set(key,copy);
+    }
+  });
+  return merged;
+}
+function consolidateCart(items=state.cart){
+  const original=items||[];
+  if(!original.length)return [];
+  const hadFinalSeparator=Boolean(original[original.length-1]?.separatorAfter);
+  const segments=cartSegments(original);
+  const out=[];
+  segments.forEach((segment,idx)=>{
+    const merged=mergeSegmentItems(segment);
+    // La séparation manuelle reste exactement entre les mêmes groupes.
+    const segmentEndedWithSeparator=Boolean(segment[segment.length-1]?.separatorAfter);
+    if(merged.length && segmentEndedWithSeparator){
+      merged[merged.length-1].separatorAfter=true;
+    }
+    out.push(...merged);
+  });
+  if(out.length && !hadFinalSeparator && out[out.length-1].separatorAfter){
+    out[out.length-1].separatorAfter=false;
+  }
+  return out;
+}
+function currentManualSegmentStart(){
+  for(let i=state.cart.length-1;i>=0;i--){
+    if(state.cart[i].separatorAfter)return i+1;
+  }
+  return 0;
+}
+
 function addProduct(p){
   if(p.stock<=0)return toast('Produit en rupture');
-  const e=state.cart.find(i=>i.id===p.id&&!i.separatorAfter);
-  if(e)e.qty++;else state.cart.push({...p,qty:1,separatorAfter:false,service:({Entrées:'Entrée',Plats:'Plat',Desserts:'Dessert',Boissons:'Boisson'}[p.cat]||'Plat')});
+  const defaultService=({Entrées:'Entrée',Plats:'Plat',Desserts:'Dessert',Boissons:'Boisson'}[p.cat]||'Plat');
+  const start=currentManualSegmentStart();
+  const currentSegment=state.cart.slice(start);
+  const e=currentSegment.find(i=>Number(i.id)===Number(p.id) && (i.service||defaultService)===defaultService);
+  if(e){
+    e.qty=Number(e.qty||0)+1;
+  }else{
+    state.cart.push({...p,qty:1,separatorAfter:false,service:defaultService});
+  }
+  state.cart=consolidateCart(state.cart);
   state.sent=false;state.dirty=true;save();renderCart()
 }
-function changeQty(i,d){i.qty+=d;if(i.qty<=0)state.cart=state.cart.filter(x=>x!==i);state.sent=false;state.dirty=true;save();renderCart()}
+function changeQty(i,d){
+  i.qty+=d;
+  if(i.qty<=0)state.cart=state.cart.filter(x=>x!==i);
+  state.cart=consolidateCart(state.cart);
+  state.sent=false;state.dirty=true;save();renderCart()
+}
 function renderCart(){
   const w=qs('#cart');w.innerHTML='';
   if(!state.cart.length)w.innerHTML='<div class="empty">Aucun article</div>';
@@ -166,6 +238,12 @@ qs('#sendOrderBtn').onclick=()=>{
   if(!state.cashOpen)return toast('Ouvrez la caisse');
   if(!state.cart.length)return toast('Commande vide');
   if(state.currentMode==='table'&&!state.tableId)return toast('Choisissez une table');
+
+  // Regroupement final juste avant l'envoi.
+  // Exemple : Coca → Bière → Coca devient 2 × Coca + 1 × Bière.
+  // Les lignes de séparation manuelles restent respectées.
+  state.cart=consolidateCart(state.cart);
+
   if(state.currentMode==='table')state.openOrders[state.tableId]={items:structuredClone(state.cart),sentAt:new Date().toISOString()};
   state.sent=true;state.dirty=false;save();renderTables();renderCart();
   const groups={Cuisine:[],Bar:[],Dessert:[]};state.cart.forEach(i=>(groups[i.station]||groups.Cuisine).push(i));

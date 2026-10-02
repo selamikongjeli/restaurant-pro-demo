@@ -1,3 +1,22 @@
+# Restaurant Pro v2.15 — Regroupement automatique des articles
+
+Cette version remplace l'idée de « familles de produits » de la v2.14.
+
+Le comportement demandé est maintenant :
+
+- pointer Coca ;
+- pointer Bière ;
+- pointer Coca ;
+
+avant l'envoi, la caisse regroupe automatiquement la commande en :
+
+- **2 × Coca**
+- **1 × Bière**
+
+Le regroupement fonctionne même si les articles identiques n'ont pas été pointés l'un à la suite de l'autre.
+
+Les **séparations manuelles** restent prioritaires : Restaurant Pro ne regroupe pas un article à travers une ligne de séparation manuelle, afin de conserver l'ordre voulu par le serveur.
+
 # Restaurant Pro v2.13 — Comptabilité + Facturation
 
 Nouveaux modules : pré-comptabilité, dépenses, fournisseurs, TVA estimée, résultat estimé, export CSV, factures clients et aperçu facture.
