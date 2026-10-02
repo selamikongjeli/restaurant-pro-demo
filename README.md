@@ -1,3 +1,14 @@
+# Restaurant Pro v2.16 — Options, sécurité, KDS et employés
+
+- Options/suppléments et notes cuisine par produit.
+- Les articles ne se regroupent que si leurs options sont identiques.
+- Annulation de commande et remboursement avec PIN responsable/admin.
+- Écran KDS : Nouveau → En préparation → Prêt → Servi, par Cuisine/Bar/Dessert.
+- Gestion employés : serveur, responsable, administrateur, PIN, actif/inactif.
+- Les remboursements sont exclus du chiffre d'affaires de la démo.
+
+Cette version reste une démonstration GitHub Pages non certifiée SCE / Peppol.
+
 # Restaurant Pro v2.15 — Regroupement automatique des articles
 
 Cette version remplace l'idée de « familles de produits » de la v2.14.

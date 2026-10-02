@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
-<title>Restaurant Pro v2.15 — Démo GitHub</title>
+<title>Restaurant Pro v2.16 — Démo GitHub</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=215">
+<link rel="stylesheet" href="style.css?v=216">
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
@@ -24,7 +24,7 @@
 <header class="topbar">
   <div>
     <div class="brand">Restaurant <span>Pro</span></div>
-    <div class="sub">v2.15 · Démo gratuite GitHub Pages</div>
+    <div class="sub">v2.16 · Démo gratuite GitHub Pages</div>
   </div>
   <div class="top-actions">
     <span id="cashBadge" class="badge closed">Caisse fermée</span>
@@ -39,6 +39,8 @@
   <button class="navbtn nav-reservations" data-page="reservations">📅 Réservations</button>
   <button class="navbtn manager-only" data-page="products">Produits</button>
   <button class="navbtn manager-only" data-page="stock">Stock</button>
+  <button class="navbtn" data-page="kds">👨‍🍳 Cuisine KDS</button>
+  <button class="navbtn manager-only" data-page="employees">Employés</button>
   <button class="navbtn manager-only" data-page="reports">Rapports</button>
   <button class="navbtn manager-only" data-page="accounting">Comptabilité</button>
   <button class="navbtn manager-only" data-page="invoices">Facturation</button>
@@ -87,6 +89,7 @@
         <button id="sendOrderBtn" class="primary">📤 Envoyer commande</button>
         <button id="splitBillBtn">🧾 Séparer note</button>
         <button id="transferTableBtn">🔄 Transférer table</button>
+        <button id="cancelOrderBtn" class="danger-order">⛔ Annuler commande</button>
       </div>
       <div class="paymethods">
         <button class="pay active" data-pay="card">💳 Carte</button>
@@ -151,6 +154,17 @@
   <div id="stockList" class="admin-list"></div>
 </section>
 
+
+<section id="page-kds" class="page hidden">
+  <div class="section-title"><div><h1>Cuisine KDS</h1><div class="muted">Cuisine · Bar · Dessert</div></div>
+    <div class="kds-toolbar"><button class="kds-filter active" data-station="all">Tout</button><button class="kds-filter" data-station="Cuisine">Cuisine</button><button class="kds-filter" data-station="Bar">Bar</button><button class="kds-filter" data-station="Dessert">Dessert</button></div>
+  </div><div id="kdsBoard" class="kds-board"></div>
+</section>
+<section id="page-employees" class="page hidden manager-only">
+  <div class="section-title"><div><h1>Employés</h1><div class="muted">Serveurs · responsables · administrateurs</div></div><button id="newEmployeeBtn" class="primary">+ Nouvel employé</button></div>
+  <div id="employeeStats" class="big-stats"></div><div id="employeesList" class="admin-list"></div>
+</section>
+
 <section id="page-reports" class="page hidden manager-only">
   <div class="section-title"><h1>Rapports</h1><button id="resetDemoBtn" class="dangerbtn">Réinitialiser la démo</button></div>
   <div id="reportStats" class="big-stats"></div>
@@ -190,6 +204,6 @@
 </div>
 <button id="floatingReservationsBtn" class="floating-reservations">📅 Réservations</button>
 <div id="toast"></div>
-<script src="app.js?v=215"></script>
+<script src="app.js?v=216"></script>
 </body>
 </html>
