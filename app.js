@@ -14,18 +14,18 @@ const defaults={
     {id:1,cat:'Entrées',name:'Croquettes parmesan',price:12.9,vat:12,station:'Cuisine',stock:30,low:5},
     {id:2,cat:'Entrées',name:'Croquettes crevettes',price:15.9,vat:12,station:'Cuisine',stock:24,low:5},
     {id:3,cat:'Entrées',name:'Scampis à l’ail',price:14.5,vat:12,station:'Cuisine',stock:20,low:4},
-    {id:4,cat:'Plats',name:'Boulets liégeois',price:19.9,vat:12,station:'Cuisine',stock:40,low:8,choiceLabel:'Accompagnement',choices:['Frites','Salade','Pommes vapeur'],extras:[{name:'Boulet supplémentaire',price:5},{name:'Sauce supplémentaire',price:1.5}]},
+    {id:4,cat:'Plats',name:'Boulets liégeois',price:19.9,vat:12,station:'Cuisine',stock:40,low:8},
     {id:5,cat:'Plats',name:'Carbonnade',price:25.9,vat:12,station:'Cuisine',stock:25,low:5},
     {id:6,cat:'Plats',name:'Vol-au-vent',price:22.9,vat:12,station:'Cuisine',stock:18,low:4},
-    {id:7,cat:'Plats',name:'Entrecôte',price:29.9,vat:12,station:'Cuisine',stock:16,low:4,choiceLabel:'Cuisson',choices:['Bleu','Saignant','À point','Bien cuit'],extras:[{name:'Sauce poivre',price:2},{name:'Sauce béarnaise',price:2},{name:'Frites supplémentaires',price:3}]},
+    {id:7,cat:'Plats',name:'Entrecôte',price:29.9,vat:12,station:'Cuisine',stock:16,low:4,askCooking:true,askSauce:true},
     {id:8,cat:'Desserts',name:'Café liégeois',price:8.5,vat:12,station:'Dessert',stock:30,low:5},
     {id:9,cat:'Desserts',name:'Crème brûlée',price:8.5,vat:12,station:'Dessert',stock:22,low:4},
-    {id:10,cat:'Boissons',name:'Coca-Cola',price:3.5,vat:21,station:'Bar',stock:60,low:10,choiceLabel:'Type',choices:['Normal','Zéro'],extras:[{name:'Citron',price:0}]},
+    {id:10,cat:'Boissons',name:'Coca-Cola',price:3.5,vat:21,station:'Bar',stock:60,low:10},
     {id:11,cat:'Boissons',name:'Jupiler',price:3.6,vat:21,station:'Bar',stock:70,low:12},
     {id:12,cat:'Boissons',name:'Verre de vin',price:5,vat:21,station:'Bar',stock:50,low:8}
   ],
   cart:[],openOrders:{},payments:[],reservations:[],nextReservationId:1,nextProductId:13,
-  expenses:[],suppliers:[],invoices:[],nextExpenseId:1,nextSupplierId:1,nextInvoiceId:1,employees:[{id:1,name:'Admin',username:'admin',pin:'3333',role:'admin',active:true},{id:2,name:'Responsable',username:'manager',pin:'2222',role:'manager',active:true},{id:3,name:'Serveur',username:'serveur',pin:'1111',role:'server',active:true}],nextEmployeeId:4,kdsTickets:[],nextKdsTicketId:1,kdsStationFilter:'all',auditLog:[],
+  expenses:[],suppliers:[],invoices:[],nextExpenseId:1,nextSupplierId:1,nextInvoiceId:1,
   reservationDate:null,reservationSearch:'',reservationStatusFilter:'all',
   settings:{
     establishmentName:'Restaurant Pro',
@@ -38,17 +38,23 @@ const defaults={
 let state=structuredClone(defaults);
 
 function save(){localStorage.setItem(STORAGE,JSON.stringify(state))}
-function ensureV216State(){
-  if(!Array.isArray(state.employees)||!state.employees.length)state.employees=structuredClone(defaults.employees);
-  if(!Array.isArray(state.kdsTickets))state.kdsTickets=[];if(!Array.isArray(state.auditLog))state.auditLog=[];
-  state.nextEmployeeId=Number(state.nextEmployeeId)||Math.max(0,...state.employees.map(e=>Number(e.id)||0))+1;
-  state.nextKdsTicketId=Number(state.nextKdsTicketId)||Math.max(0,...state.kdsTickets.map(t=>Number(t.id)||0))+1;
-  const ent=state.products.find(p=>p.name==='Entrecôte');if(ent&&!ent.choices){ent.choiceLabel='Cuisson';ent.choices=['Bleu','Saignant','À point','Bien cuit'];ent.extras=[{name:'Sauce poivre',price:2},{name:'Sauce béarnaise',price:2},{name:'Frites supplémentaires',price:3}]}
-  const bou=state.products.find(p=>p.name==='Boulets liégeois');if(bou&&!bou.choices){bou.choiceLabel='Accompagnement';bou.choices=['Frites','Salade','Pommes vapeur'];bou.extras=[{name:'Boulet supplémentaire',price:5},{name:'Sauce supplémentaire',price:1.5}]}
-  const coca=state.products.find(p=>p.name==='Coca-Cola');if(coca&&!coca.choices){coca.choiceLabel='Type';coca.choices=['Normal','Zéro'];coca.extras=[{name:'Citron',price:0}]}
+function productNeedsCooking(p){
+  return /entrec[oô]te|steak|filet de boeuf|filet de bœuf|burger/i.test(String(p?.name||''));
 }
-function load(){try{const d=JSON.parse(localStorage.getItem(STORAGE)||'null');if(d)state={...structuredClone(defaults),...d,settings:{...defaults.settings,...(d.settings||{})}};ensureV216State()}catch{ensureV216State()}}
-function audit(action,details={}){state.auditLog.push({id:Date.now()+Math.random(),at:new Date().toISOString(),action,user:state.user?.name||'Système',details});if(state.auditLog.length>500)state.auditLog=state.auditLog.slice(-500)}
+function productNeedsSauce(p){
+  return /entrec[oô]te|steak|filet de boeuf|filet de bœuf|burger/i.test(String(p?.name||''));
+}
+function load(){
+  try{
+    const d=JSON.parse(localStorage.getItem(STORAGE)||'null');
+    if(d)state={...structuredClone(defaults),...d,settings:{...defaults.settings,...(d.settings||{})}};
+    state.products=(state.products||[]).map(p=>({
+      ...p,
+      askCooking:p.askCooking!==undefined?Boolean(p.askCooking):productNeedsCooking(p),
+      askSauce:p.askSauce!==undefined?Boolean(p.askSauce):productNeedsSauce(p)
+    }));
+  }catch{}
+}
 function toast(msg){const t=qs('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
 function modal(title,html){qs('#modalTitle').textContent=title;qs('#modalBody').innerHTML=html;qs('#modal').classList.remove('hidden')}
 function closeModal(){qs('#modal').classList.add('hidden')}
@@ -68,9 +74,9 @@ function showApp(){
 }
 function login(){
   const u=qs('#loginUser').value.trim().toLowerCase(),p=qs('#loginPin').value;
-  const emp=state.employees.find(e=>e.active!==false&&String(e.username).toLowerCase()===u&&String(e.pin)===String(p));
-  if(!emp)return toast('Identifiants incorrects ou compte désactivé');
-  state.user={employeeId:emp.id,username:emp.username,role:emp.role,name:emp.name};audit('LOGIN',{employeeId:emp.id});save();showApp()
+  const users={admin:{pin:'3333',role:'admin',name:'Admin'},manager:{pin:'2222',role:'manager',name:'Responsable'},serveur:{pin:'1111',role:'server',name:'Serveur'}};
+  if(!users[u]||users[u].pin!==p)return toast('Identifiants incorrects');
+  state.user={username:u,role:users[u].role,name:users[u].name};save();showApp()
 }
 qs('#loginBtn').onclick=login;qs('#loginPin').onkeydown=e=>{if(e.key==='Enter')login()};
 qs('#logoutBtn').onclick=()=>{state.user=null;save();location.reload()};
@@ -84,8 +90,6 @@ function setPage(name){
   if(name==='reservations')renderReservations();
   if(name==='products')renderProductsAdmin();
   if(name==='stock')renderStock();
-  if(name==='kds')renderKds();
-  if(name==='employees')renderEmployees();
   if(name==='reports')renderReports();
   if(name==='accounting')renderAccounting();
   if(name==='invoices')renderInvoices();
@@ -169,8 +173,7 @@ function mergeSegmentItems(segment){
   segment.forEach(item=>{
     // Un même article est regroupé seulement s'il appartient au même service.
     // Cela évite de mélanger un article placé volontairement dans un autre service.
-    const optionKey=JSON.stringify({choice:item.selectedChoice||'',extras:(item.selectedExtras||[]).map(x=>`${x.name}:${x.price}`).sort(),note:item.itemNote||''});
-    const key=`${item.id}|${item.service||''}|${item.station||''}|${item.price}|${optionKey}`;
+    const key=`${item.id}|${item.service||''}|${item.station||''}|${item.price}|${item.cooking||''}|${item.sauce||''}`;
     if(byKey.has(key)){
       const target=byKey.get(key);
       target.qty=Number(target.qty||0)+Number(item.qty||0);
@@ -209,10 +212,46 @@ function currentManualSegmentStart(){
   return 0;
 }
 
-function productHasModifiers(p){return (Array.isArray(p.choices)&&p.choices.length)||(Array.isArray(p.extras)&&p.extras.length)}
-function modifierModal(p){const choices=p.choices||[],extras=p.extras||[];return `<div>${choices.length?`<div class="modifier-group"><h4>${esc(p.choiceLabel||'Choix')}</h4>${choices.map((c,i)=>`<div class="modifier-choice"><label><input type="radio" name="modifierChoice" value="${esc(c)}" ${i===0?'checked':''}> ${esc(c)}</label></div>`).join('')}</div>`:''}${extras.length?`<div class="modifier-group"><h4>Suppléments / options</h4>${extras.map(x=>`<div class="modifier-choice"><label><input class="modifierExtra" type="checkbox" data-name="${esc(x.name)}" data-price="${Number(x.price||0)}"> ${esc(x.name)}</label><b>${Number(x.price||0)?'+'+money(x.price):'Inclus'}</b></div>`).join('')}</div>`:''}<textarea id="modifierNote" class="modifier-notes" placeholder="Note cuisine : sans sel, allergie, bien chaud..."></textarea><button id="confirmModifierProduct" data-id="${p.id}" class="primary full" style="margin-top:10px">Ajouter à la commande</button></div>`}
-function addConfiguredProduct(p,cfg={}){if(p.stock<=0)return toast('Produit en rupture');const service=({Entrées:'Entrée',Plats:'Plat',Desserts:'Dessert',Boissons:'Boisson'}[p.cat]||'Plat'),extras=cfg.selectedExtras||[],price=Number(p.price)+extras.reduce((s,x)=>s+Number(x.price||0),0),sig=JSON.stringify({choice:cfg.selectedChoice||'',extras:extras.map(x=>`${x.name}:${x.price}`).sort(),note:cfg.itemNote||''});const start=currentManualSegmentStart(),seg=state.cart.slice(start),e=seg.find(i=>Number(i.id)===Number(p.id)&&(i.service||service)===service&&JSON.stringify({choice:i.selectedChoice||'',extras:(i.selectedExtras||[]).map(x=>`${x.name}:${x.price}`).sort(),note:i.itemNote||''})===sig);if(e)e.qty=Number(e.qty||0)+1;else state.cart.push({...p,basePrice:Number(p.price),price,qty:1,separatorAfter:false,service,selectedChoice:cfg.selectedChoice||'',selectedExtras:extras,itemNote:cfg.itemNote||''});state.cart=consolidateCart(state.cart);state.sent=false;state.dirty=true;save();renderCart()}
-function addProduct(p){if(p.stock<=0)return toast('Produit en rupture');if(productHasModifiers(p)){modal(`Options — ${p.name}`,modifierModal(p));return}addConfiguredProduct(p,{})}
+function addProduct(p){
+  if(p.stock<=0)return toast('Produit en rupture');
+  const defaultService=({Entrées:'Entrée',Plats:'Plat',Desserts:'Dessert',Boissons:'Boisson'}[p.cat]||'Plat');
+  const configurable=Boolean(p.askCooking||p.askSauce);
+
+  if(configurable){
+    // On crée d'abord une ligne séparée pour choisir sa cuisson/sauce.
+    // Ensuite les lignes avec exactement les mêmes options se regroupent.
+    state.cart.push({
+      ...p,
+      qty:1,
+      separatorAfter:false,
+      service:defaultService,
+      cooking:'',
+      sauce:''
+    });
+  }else{
+    const start=currentManualSegmentStart();
+    const e=state.cart.slice(start).find(i=>
+      Number(i.id)===Number(p.id) &&
+      (i.service||defaultService)===defaultService &&
+      !i.cooking && !i.sauce
+    );
+    if(e)e.qty=Number(e.qty||0)+1;
+    else state.cart.push({
+      ...p,
+      qty:1,
+      separatorAfter:false,
+      service:defaultService,
+      cooking:'',
+      sauce:''
+    });
+  }
+
+  state.cart=consolidateCart(state.cart);
+  state.sent=false;
+  state.dirty=true;
+  save();
+  renderCart();
+}
 function changeQty(i,d){
   i.qty+=d;
   if(i.qty<=0)state.cart=state.cart.filter(x=>x!==i);
@@ -220,24 +259,171 @@ function changeQty(i,d){
   state.sent=false;state.dirty=true;save();renderCart()
 }
 function renderCart(){
-  const w=qs('#cart');w.innerHTML='';
-  if(!state.cart.length)w.innerHTML='<div class="empty">Aucun article</div>';
+  const w=qs('#cart');
+  w.innerHTML='';
+
+  if(!state.cart.length){
+    w.innerHTML='<div class="empty">Aucun article</div>';
+  }
+
   state.cart.forEach((i,idx)=>{
-    const d=document.createElement('div');d.className='cart-item';
-    const mods=[i.selectedChoice?`${i.choiceLabel||'Choix'} : ${i.selectedChoice}`:'',...(i.selectedExtras||[]).map(x=>`${x.name}${Number(x.price||0)?' +'+money(x.price):''}`),i.itemNote?`Note : ${i.itemNote}`:''].filter(Boolean);
-    d.innerHTML=`<div class="item-top"><div><b>${esc(i.name)}</b><div class="muted">${esc(i.station)} · TVA ${i.vat}%</div>${mods.length?`<div class="option-summary">${mods.map(esc).join('<br>')}</div>`:''}</div><b>${money(i.price*i.qty)}</b></div>
-    <div class="qty"><button class="minus">−</button><b>${i.qty}</b><button class="plus">+</button></div>
-    <div class="item-controls"><select class="service"><option>Entrée</option><option>Plat</option><option>Dessert</option><option>Boisson</option></select><button class="separator ${i.separatorAfter?'active':''}">${i.separatorAfter?'✓ Retirer ligne':'➖ Ligne après'}</button></div>`;
-    d.querySelector('.service').value=i.service||'Plat';d.querySelector('.service').onchange=e=>{i.service=e.target.value;state.sent=false;state.dirty=true;save()};
-    d.querySelector('.minus').onclick=()=>changeQty(i,-1);d.querySelector('.plus').onclick=()=>changeQty(i,1);d.querySelector('.separator').onclick=()=>{i.separatorAfter=!i.separatorAfter;state.sent=false;state.dirty=true;save();renderCart()};
-    w.appendChild(d);if(i.separatorAfter&&idx<state.cart.length-1){const s=document.createElement('div');s.className='manual-sep';w.appendChild(s)}
+    const d=document.createElement('div');
+    d.className='cart-item';
+
+    const cookingValues=['Bleu','Saignant','À point','Bien cuit'];
+    const sauceValues=['Sans sauce','Béarnaise','Poivre','Champignons','Liégeoise','Mayonnaise','Autre'];
+
+    const cookingSelect=i.askCooking?`
+      <select class="cooking">
+        <option value="">🔥 Choisir cuisson</option>
+        ${cookingValues.map(v=>`<option value="${v}" ${i.cooking===v?'selected':''}>${v}</option>`).join('')}
+      </select>`:'';
+
+    const sauceSelect=i.askSauce?`
+      <select class="sauce">
+        <option value="">🥣 Choisir sauce</option>
+        ${sauceValues.map(v=>`<option value="${v}" ${i.sauce===v?'selected':''}>${v}</option>`).join('')}
+      </select>`:'';
+
+    const optionSummary=(i.cooking||i.sauce)?`
+      <div class="option-summary">
+        ${i.cooking?`🔥 Cuisson : ${esc(i.cooking)}`:''}
+        ${i.cooking&&i.sauce?' · ':''}
+        ${i.sauce?`🥣 Sauce : ${esc(i.sauce)}`:''}
+      </div>`:'';
+
+    d.innerHTML=`
+      <div class="item-top">
+        <div>
+          <b>${esc(i.name)}</b>
+          <div class="muted">${esc(i.station)} · TVA ${i.vat}%</div>
+        </div>
+        <b>${money(i.price*i.qty)}</b>
+      </div>
+
+      <div class="qty">
+        <button class="minus">−</button>
+        <b>${i.qty}</b>
+        <button class="plus">+</button>
+      </div>
+
+      ${(i.askCooking||i.askSauce)?`<div class="item-options">${cookingSelect}${sauceSelect}</div>${optionSummary}`:''}
+
+      <div class="item-controls">
+        <select class="service">
+          <option>Entrée</option>
+          <option>Plat</option>
+          <option>Dessert</option>
+          <option>Boisson</option>
+        </select>
+        <button class="separator ${i.separatorAfter?'active':''}">
+          ${i.separatorAfter?'✓ Retirer ligne':'➖ Ligne après'}
+        </button>
+      </div>`;
+
+    const service=d.querySelector('.service');
+    service.value=i.service||'Plat';
+    service.onchange=e=>{
+      i.service=e.target.value;
+      state.cart=consolidateCart(state.cart);
+      state.sent=false;
+      state.dirty=true;
+      save();
+      renderCart();
+    };
+
+    const cooking=d.querySelector('.cooking');
+    if(cooking){
+      cooking.onchange=e=>{
+        i.cooking=e.target.value;
+        state.cart=consolidateCart(state.cart);
+        state.sent=false;
+        state.dirty=true;
+        save();
+        renderCart();
+      };
+    }
+
+    const sauce=d.querySelector('.sauce');
+    if(sauce){
+      sauce.onchange=e=>{
+        i.sauce=e.target.value;
+        state.cart=consolidateCart(state.cart);
+        state.sent=false;
+        state.dirty=true;
+        save();
+        renderCart();
+      };
+    }
+
+    d.querySelector('.minus').onclick=()=>changeQty(i,-1);
+    d.querySelector('.plus').onclick=()=>changeQty(i,1);
+    d.querySelector('.separator').onclick=()=>{
+      i.separatorAfter=!i.separatorAfter;
+      state.sent=false;
+      state.dirty=true;
+      save();
+      renderCart();
+    };
+
+    w.appendChild(d);
+
+    if(i.separatorAfter&&idx<state.cart.length-1){
+      const sep=document.createElement('div');
+      sep.className='manual-sep';
+      w.appendChild(sep);
+    }
   });
+
   const total=state.cart.reduce((s,i)=>s+i.price*i.qty,0);
-  qs('#subtotal').textContent=money(total);qs('#total').textContent=money(total);qs('#payBtn').textContent=`PAYER ${money(total)}`;
+  qs('#subtotal').textContent=money(total);
+  qs('#total').textContent=money(total);
+  qs('#payBtn').textContent=`PAYER ${money(total)}`;
   qs('#payBtn').disabled=!state.cashOpen||!state.sent||state.dirty||!state.cart.length;
-  qs('#orderStatus').classList.toggle('hidden',!state.sent);qs('#orderStatus').textContent=state.sent?'✓ Commande envoyée — prête à encaisser':'';
+  qs('#orderStatus').classList.toggle('hidden',!state.sent);
+  qs('#orderStatus').textContent=state.sent?'✓ Commande envoyée — prête à encaisser':'';
 }
 qs('#clearCartBtn').onclick=()=>{if(!state.cart.length)return;state.cart=[];state.sent=false;state.dirty=false;save();renderCart()};
+
+function ticketItemKey(i){
+  return `${i.id}|${i.service||''}|${i.station||''}|${i.price}|${i.cooking||''}|${i.sauce||''}`;
+}
+function regroupTicketSegment(items){
+  const out=[];
+  const map=new Map();
+  items.forEach(i=>{
+    const key=ticketItemKey(i);
+    if(map.has(key)){
+      map.get(key).qty+=Number(i.qty||1);
+    }else{
+      const copy={...i,qty:Number(i.qty||1),separatorAfter:false};
+      map.set(key,copy);
+      out.push(copy);
+    }
+  });
+  return out;
+}
+function buildTicketItems(items){
+  const segments=cartSegments(items);
+  const out=[];
+  segments.forEach(segment=>{
+    const hadSep=Boolean(segment[segment.length-1]?.separatorAfter);
+    const merged=regroupTicketSegment(segment);
+    if(hadSep&&merged.length)merged[merged.length-1].separatorAfter=true;
+    out.push(...merged);
+  });
+  return out;
+}
+function ticketOptions(i){
+  const parts=[];
+  if(i.cooking)parts.push(`🔥 Cuisson : ${esc(i.cooking)}`);
+  if(i.sauce)parts.push(`🥣 Sauce : ${esc(i.sauce)}`);
+  return parts.length?`<div class="ticket-options">${parts.join(' · ')}</div>`:'';
+}
+function ticketItemHtml(i){
+  return `<div class="ticket-line"><b>${i.qty} × ${esc(i.name)}</b>${ticketOptions(i)}</div>${i.separatorAfter?'<div class="sep"></div>':''}`;
+}
+
 qs('#sendOrderBtn').onclick=()=>{
   if(!state.cashOpen)return toast('Ouvrez la caisse');
   if(!state.cart.length)return toast('Commande vide');
@@ -250,9 +436,16 @@ qs('#sendOrderBtn').onclick=()=>{
 
   if(state.currentMode==='table')state.openOrders[state.tableId]={items:structuredClone(state.cart),sentAt:new Date().toISOString()};
   state.sent=true;state.dirty=false;save();renderTables();renderCart();
-  const groups={Cuisine:[],Bar:[],Dessert:[]};state.cart.forEach(i=>(groups[i.station]||groups.Cuisine).push(i));
-  Object.entries(groups).filter(([,items])=>items.length).forEach(([station,items])=>state.kdsTickets.push({id:state.nextKdsTicketId++,station,status:'new',context:state.currentMode==='table'?(state.tables.find(t=>t.id===state.tableId)?.name||'Table'):(state.currentMode==='takeaway'?'Emporter':'Livraison'),items:structuredClone(items),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}));audit('ORDER_SENT',{tableId:state.tableId,total:state.cart.reduce((s,i)=>s+i.price*i.qty,0)});save();
-  modal('Tickets envoyés',Object.entries(groups).filter(([,a])=>a.length).map(([k,a])=>`<div class="ticket"><b>${k.toUpperCase()}</b><hr>${a.map(i=>`${i.qty} × ${esc(i.name)}${i.separatorAfter?'<div class="sep"></div>':'<br>'}`).join('')}</div>`).join(''))
+  const finalTicketItems=buildTicketItems(state.cart);
+  const groups={Cuisine:[],Bar:[],Dessert:[]};
+  finalTicketItems.forEach(i=>(groups[i.station]||groups.Cuisine).push(i));
+
+  modal('Tickets envoyés — v2.17',
+    Object.entries(groups)
+      .filter(([,items])=>items.length)
+      .map(([station,items])=>`<div class="ticket"><b>${station.toUpperCase()}</b><hr>${items.map(ticketItemHtml).join('')}</div>`)
+      .join('')
+  )
 };
 qs('#transferTableBtn').onclick=()=>{
   if(state.currentMode!=='table'||!state.tableId)return toast('Choisissez une table');
@@ -271,7 +464,7 @@ qs('#payBtn').onclick=()=>{
   if(qs('#payBtn').disabled)return;
   const total=state.cart.reduce((s,i)=>s+i.price*i.qty,0),vat={6:0,12:0,21:0};
   state.cart.forEach(i=>{const t=i.price*i.qty;vat[i.vat]+=t-t/(1+i.vat/100);const p=state.products.find(p=>p.id===i.id);if(p)p.stock=Math.max(0,p.stock-i.qty)});
-  state.payments.push({id:Date.now(),date:new Date().toISOString(),total,method:state.payment,vat,items:structuredClone(state.cart),status:'paid',refundedAt:null,refundedBy:null});audit('PAYMENT',{total,method:state.payment,tableId:state.tableId});
+  state.payments.push({id:Date.now(),date:new Date().toISOString(),total,method:state.payment,vat,items:structuredClone(state.cart)});
   if(state.tableId)delete state.openOrders[state.tableId];
   const receipt=`<div class="ticket"><div style="text-align:center"><b>${esc(state.settings.establishmentName)}</b><br>Ticket démo</div><hr>${state.cart.map(i=>`<div style="display:flex;justify-content:space-between"><span>${i.qty} × ${esc(i.name)}</span><b>${money(i.qty*i.price)}</b></div>`).join('')}<hr><div style="display:flex;justify-content:space-between;font-size:18px"><b>TOTAL</b><b>${money(total)}</b></div><hr>${[6,12,21].filter(r=>vat[r]>0).map(r=>`TVA ${r}% : ${money(vat[r])}<br>`).join('')}</div>`;
   state.cart=[];state.sent=false;state.dirty=false;state.tableId=null;save();renderAll();modal('Ticket client',receipt)
@@ -349,9 +542,21 @@ function renderProductsAdmin(){
   qs('#productsAdmin').innerHTML=state.products.map(p=>`<div class="admin-row"><div><b>${esc(p.name)}</b><div class="muted">${esc(p.cat)} · ${esc(p.station)}</div></div><div>${money(p.price)}</div><div>TVA ${p.vat}%</div><div><button class="editProduct" data-id="${p.id}">Modifier</button></div></div>`).join('')
 }
 qs('#newProductBtn').onclick=()=>modal('Nouveau produit',productForm());
-function parseChoiceList(v){return String(v||'').split(';').map(x=>x.trim()).filter(Boolean)}
-function parseExtrasList(v){return String(v||'').split(';').map(x=>x.trim()).filter(Boolean).map(x=>{const [name,price]=x.split('=');return{name:String(name||'').trim(),price:Number(String(price||'0').replace(',','.'))||0}}).filter(x=>x.name)}
-function productForm(p=null){const x=p||{};return `<div class="form-grid"><label class="span2">Nom<input id="pName" value="${esc(x.name||'')}"></label><label>Catégorie<select id="pCat">${['Entrées','Plats','Desserts','Boissons'].map(c=>`<option ${x.cat===c?'selected':''}>${c}</option>`).join('')}</select></label><label>Prix TTC<input id="pPrice" type="number" step="0.01" value="${x.price||0}"></label><label>TVA<select id="pVat">${[6,12,21].map(v=>`<option ${x.vat===v?'selected':''}>${v}</option>`).join('')}</select></label><label>Station<select id="pStation">${['Cuisine','Bar','Dessert'].map(c=>`<option ${x.station===c?'selected':''}>${c}</option>`).join('')}</select></label><label>Stock<input id="pStock" type="number" value="${x.stock??0}"></label><label>Seuil bas<input id="pLow" type="number" value="${x.low??5}"></label><label class="span3">Choix (séparés par ;)<input id="pChoices" value="${esc((x.choices||[]).join('; '))}" placeholder="Bleu; Saignant; À point"></label><label class="span3">Nom du choix<input id="pChoiceLabel" value="${esc(x.choiceLabel||'Choix')}" placeholder="Cuisson"></label><label class="span3">Suppléments (Nom=Prix; ...)<input id="pExtras" value="${esc((x.extras||[]).map(e=>`${e.name}=${e.price}`).join('; '))}" placeholder="Sauce poivre=2; Frites=3"></label><button id="${p?'saveProductEdit':'saveProduct'}" ${p?`data-id="${p.id}"`:''} class="primary span3">${p?'Enregistrer':'Créer'}</button></div>`}
+function productForm(p=null){
+  const x=p||{};
+  return `<div class="form-grid">
+    <label class="span2">Nom<input id="pName" value="${esc(x.name||'')}"></label>
+    <label>Catégorie<select id="pCat">${['Entrées','Plats','Desserts','Boissons'].map(c=>`<option ${x.cat===c?'selected':''}>${c}</option>`).join('')}</select></label>
+    <label>Prix TTC<input id="pPrice" type="number" step="0.01" value="${x.price||0}"></label>
+    <label>TVA<select id="pVat">${[6,12,21].map(v=>`<option ${x.vat===v?'selected':''}>${v}</option>`).join('')}</select></label>
+    <label>Station<select id="pStation">${['Cuisine','Bar','Dessert'].map(c=>`<option ${x.station===c?'selected':''}>${c}</option>`).join('')}</select></label>
+    <label>Demander cuisson<select id="pAskCooking"><option value="0" ${!x.askCooking?'selected':''}>Non</option><option value="1" ${x.askCooking?'selected':''}>Oui</option></select></label>
+    <label>Demander sauce<select id="pAskSauce"><option value="0" ${!x.askSauce?'selected':''}>Non</option><option value="1" ${x.askSauce?'selected':''}>Oui</option></select></label>
+    <label>Stock<input id="pStock" type="number" value="${x.stock??0}"></label>
+    <label>Seuil bas<input id="pLow" type="number" value="${x.low??5}"></label>
+    <button id="${p?'saveProductEdit':'saveProduct'}" ${p?`data-id="${p.id}"`:''} class="primary span3">${p?'Enregistrer':'Créer'}</button>
+  </div>`;
+}
 function renderStock(){qs('#stockList').innerHTML=state.products.map(p=>`<div class="admin-row"><div><b>${esc(p.name)}</b></div><div>${esc(p.cat)}</div><div><b>${p.stock}</b>${p.stock<=p.low?' ⚠️':''}</div><div><button class="stockMinus" data-id="${p.id}">−</button> <button class="stockPlus" data-id="${p.id}">+</button></div></div>`).join('')}
 function renderReports(){
   const total=state.payments.reduce((s,p)=>s+p.total,0),today=localDateISO(),todayPays=state.payments.filter(p=>p.date.slice(0,10)===today),todayTotal=todayPays.reduce((s,p)=>s+p.total,0);
@@ -360,9 +565,6 @@ function renderReports(){
   const pm={card:0,cash:0,meal:0};state.payments.forEach(p=>pm[p.method]=(pm[p.method]||0)+p.total);qs('#paymentsReport').innerHTML=`<h3>Moyens de paiement</h3>Carte : <b>${money(pm.card)}</b><br>Espèces : <b>${money(pm.cash)}</b><br>Chèque-repas : <b>${money(pm.meal)}</b>`
 }
 qs('#resetDemoBtn').onclick=()=>modal('Réinitialiser la démo',`<p>Supprimer toutes les données de démonstration de ce navigateur ?</p><button id="confirmReset" class="dangerbtn">Oui, réinitialiser</button>`);
-qs('#newEmployeeBtn').onclick=()=>modal('Nouvel employé',employeeForm());
-qsa('.kds-filter').forEach(b=>b.onclick=()=>{state.kdsStationFilter=b.dataset.station;save();renderKds()});
-qs('#cancelOrderBtn').onclick=()=>{if(!state.cart.length)return toast('Aucune commande à annuler');modal('Annuler la commande',managerPinModal('annulation de la commande','cancelOrder',String(state.tableId||'')))};
 
 function periodBounds(period){const now=new Date(),today=localDateISO(now);if(period==='today')return{from:today,to:today};if(period==='month'){const from=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;const last=new Date(now.getFullYear(),now.getMonth()+1,0);return{from,to:localDateISO(last)}}if(period==='year')return{from:`${now.getFullYear()}-01-01`,to:`${now.getFullYear()}-12-31`};return{from:null,to:null}}
 function dateInPeriod(date,period){const b=periodBounds(period);if(!b.from)return true;const d=String(date).slice(0,10);return d>=b.from&&d<=b.to}
@@ -378,14 +580,6 @@ function invoiceTotals(inv){let ht=0,tva=0,ttc=0;(inv.lines||[]).forEach(l=>{con
 function renderInvoices(){const total=state.invoices.reduce((s,i)=>s+invoiceTotals(i).ttc,0),paid=state.invoices.filter(i=>i.status==='paid').reduce((s,i)=>s+invoiceTotals(i).ttc,0),due=state.invoices.filter(i=>['draft','sent'].includes(i.status)).reduce((s,i)=>s+invoiceTotals(i).ttc,0);qs('#invoiceStats').innerHTML=`<div class="stat"><span>Factures</span><b>${state.invoices.length}</b></div><div class="stat"><span>Total facturé</span><b>${money(total)}</b></div><div class="stat"><span>Payé</span><b class="accounting-amount positive">${money(paid)}</b></div><div class="stat"><span>À recevoir</span><b>${money(due)}</b></div><div class="stat"><span>Brouillons</span><b>${state.invoices.filter(i=>i.status==='draft').length}</b></div>`;qs('#invoicesList').innerHTML=state.invoices.slice().sort((a,b)=>b.id-a.id).map(i=>{const t=invoiceTotals(i);return `<div class="admin-row"><div><b>FAC-${String(i.id).padStart(4,'0')}</b><div class="muted">${esc(i.date)} · ${esc(i.customerName)}</div></div><div><span class="invoice-status ${i.status}">${esc(i.status)}</span></div><div><b>${money(t.ttc)}</b><div class="muted">TVA ${money(t.tva)}</div></div><div><button class="viewInvoice" data-id="${i.id}">Voir</button> <button class="editInvoice" data-id="${i.id}">Modifier</button></div></div>`}).join('')||'<div class="empty">Aucune facture</div>'}
 function invoicePreview(i){const t=invoiceTotals(i);return `<div class="invoice-preview"><div style="display:flex;justify-content:space-between"><div><h2>${esc(state.settings.establishmentName)}</h2><div class="muted">Facture de démonstration</div></div><div><h3>FAC-${String(i.id).padStart(4,'0')}</h3><div>${esc(i.date)}</div></div></div><hr><b>Client</b><br>${esc(i.customerName)}<br>${esc(i.customerAddress||'')}${i.customerVat?`<br>TVA : ${esc(i.customerVat)}`:''}<table class="invoice-preview-table"><thead><tr><th>Description</th><th>Qté</th><th>PU HT</th><th>TVA</th><th>TTC</th></tr></thead><tbody>${i.lines.map(l=>`<tr><td>${esc(l.description)}</td><td>${l.qty}</td><td>${money(l.unitPrice)}</td><td>${l.vat}%</td><td>${money(l.qty*l.unitPrice*(1+l.vat/100))}</td></tr>`).join('')}</tbody></table><div class="invoice-preview-total"><div>HT : <b>${money(t.ht)}</b></div><div>TVA : <b>${money(t.tva)}</b></div><div style="font-size:20px">TTC : <b>${money(t.ttc)}</b></div></div><div class="muted" style="margin-top:16px">Document de démonstration — non Peppol / non SCE</div></div>`}
 qs('#newExpenseBtn').onclick=()=>modal('Nouvelle dépense',expenseForm());qs('#newSupplierBtn').onclick=()=>modal('Nouveau fournisseur',supplierForm());qs('#exportAccountingCsvBtn').onclick=()=>downloadText(`restaurant-pro-comptabilite-${localDateISO()}.csv`,accountingCsv(),'text/csv');qs('#accountingPeriod').onchange=renderAccounting;qs('#newInvoiceBtn').onclick=()=>modal('Nouvelle facture',invoiceForm());
-
-
-function verifyManagerPin(pin){return state.employees.find(e=>e.active!==false&&['manager','admin'].includes(e.role)&&String(e.pin)===String(pin))||null}
-function managerPinModal(label,action,target=''){return `<div class="manager-pin-box"><p>Validation responsable requise : <b>${esc(label)}</b></p><input id="managerPinInput" type="password" inputmode="numeric" placeholder="PIN responsable / admin"><button id="confirmManagerPinBtn" data-action="${action}" data-target="${esc(target)}" class="primary">Valider</button><div class="muted">Démo : responsable 2222 · admin 3333</div></div>`}
-function renderKds(){const filter=state.kdsStationFilter||'all',statuses=['new','preparing','ready','served'],labels={new:'Nouveaux',preparing:'En préparation',ready:'Prêts',served:'Servis'},board=qs('#kdsBoard');if(!board)return;qsa('.kds-filter').forEach(b=>b.classList.toggle('active',b.dataset.station===filter));board.innerHTML=statuses.map(status=>{const tickets=state.kdsTickets.filter(t=>t.status===status&&(filter==='all'||t.station===filter)).sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt)));return `<div class="kds-column"><div class="kds-column-head"><h2>${labels[status]}</h2><span class="badge">${tickets.length}</span></div>${tickets.map(t=>`<div class="kds-ticket ${t.status}"><div class="kds-ticket-head"><span>#${t.id} · ${esc(t.station)}</span><span>${esc(t.context)}</span></div><div class="kds-time">${new Date(t.createdAt).toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}</div>${t.items.map(i=>{const mods=[i.selectedChoice,...(i.selectedExtras||[]).map(x=>x.name),i.itemNote].filter(Boolean);return `<div class="kds-item"><b>${i.qty} × ${esc(i.name)}</b>${mods.length?`<div class="kds-mods">${mods.map(esc).join(' · ')}</div>`:''}</div>`}).join('')}<div class="kds-actions">${t.status==='new'?`<button class="kdsStatusBtn" data-id="${t.id}" data-status="preparing">Préparer</button>`:''}${t.status==='preparing'?`<button class="kdsStatusBtn" data-id="${t.id}" data-status="ready">Prêt</button>`:''}${t.status==='ready'?`<button class="kdsStatusBtn" data-id="${t.id}" data-status="served">Servi</button>`:''}${t.status==='served'?`<button class="kdsDeleteBtn" data-id="${t.id}">Archiver</button>`:''}</div></div>`).join('')||'<div class="empty">Aucun ticket</div>'}</div>`}).join('')}
-function employeeForm(emp=null){const x=emp||{};return `<div class="form-grid"><label class="span2">Nom<input id="empName" value="${esc(x.name||'')}"></label><label>Utilisateur<input id="empUsername" value="${esc(x.username||'')}"></label><label>PIN<input id="empPin" type="password" inputmode="numeric" value="${esc(x.pin||'')}"></label><label>Rôle<select id="empRole"><option value="server" ${x.role==='server'?'selected':''}>Serveur</option><option value="manager" ${x.role==='manager'?'selected':''}>Responsable</option><option value="admin" ${x.role==='admin'?'selected':''}>Administrateur</option></select></label><label>Statut<select id="empActive"><option value="1" ${x.active!==false?'selected':''}>Actif</option><option value="0" ${x.active===false?'selected':''}>Inactif</option></select></label><button id="${emp?'saveEmployeeEdit':'saveEmployee'}" ${emp?`data-id="${emp.id}"`:''} class="primary span3">${emp?'Enregistrer':'Créer'}</button></div>`}
-function renderEmployees(){if(!qs('#employeesList'))return;const active=state.employees.filter(e=>e.active!==false).length;qs('#employeeStats').innerHTML=`<div class="stat"><span>Employés</span><b>${state.employees.length}</b></div><div class="stat"><span>Actifs</span><b>${active}</b></div><div class="stat"><span>Serveurs</span><b>${state.employees.filter(e=>e.role==='server'&&e.active!==false).length}</b></div><div class="stat"><span>Responsables</span><b>${state.employees.filter(e=>e.role==='manager'&&e.active!==false).length}</b></div><div class="stat"><span>Admins</span><b>${state.employees.filter(e=>e.role==='admin'&&e.active!==false).length}</b></div>`;qs('#employeesList').innerHTML=state.employees.map(e=>`<div class="admin-row ${e.active===false?'employee-inactive':''}"><div><b>${esc(e.name)}</b><div class="muted">@${esc(e.username)}</div></div><div><span class="employee-role">${e.role==='server'?'Serveur':e.role==='manager'?'Responsable':'Administrateur'}</span></div><div>${e.active===false?'Inactif':'Actif'}</div><div><button class="editEmployeeBtn" data-id="${e.id}">Modifier</button></div></div>`).join('')}
-function renderReports(){const valid=state.payments.filter(p=>p.status!=='refunded'),total=valid.reduce((s,p)=>s+p.total,0),today=localDateISO(),todayPays=valid.filter(p=>p.date.slice(0,10)===today),todayTotal=todayPays.reduce((s,p)=>s+p.total,0);qs('#reportStats').innerHTML=`<div class="stat"><span>CA total démo</span><b>${money(total)}</b></div><div class="stat"><span>CA aujourd’hui</span><b>${money(todayTotal)}</b></div><div class="stat"><span>Paiements</span><b>${valid.length}</b></div><div class="stat"><span>Commandes ouvertes</span><b>${Object.keys(state.openOrders).length}</b></div><div class="stat"><span>Réservations</span><b>${state.reservations.length}</b></div>`;const vat={6:0,12:0,21:0};valid.forEach(p=>[6,12,21].forEach(v=>vat[v]+=Number(p.vat?.[v]||0)));qs('#vatReport').innerHTML=`<h3>TVA</h3>${[6,12,21].map(v=>`TVA ${v}% : <b>${money(vat[v])}</b><br>`).join('')}`;const pm={card:0,cash:0,meal:0};valid.forEach(p=>pm[p.method]=(pm[p.method]||0)+p.total);qs('#paymentsReport').innerHTML=`<h3>Moyens de paiement</h3>Carte : <b>${money(pm.card)}</b><br>Espèces : <b>${money(pm.cash)}</b><br>Chèque-repas : <b>${money(pm.meal)}</b><h3 style="margin-top:18px">Derniers paiements</h3>${state.payments.slice().reverse().slice(0,15).map(p=>`<div class="admin-row ${p.status==='refunded'?'refunded-payment':''}"><div>${new Date(p.date).toLocaleString('fr-BE')}${p.status==='refunded'?'<span class="refund-badge">Remboursé</span>':''}</div><div>${esc(p.method)}</div><div><b>${money(p.total)}</b></div><div>${p.status!=='refunded'?`<button class="refundPaymentBtn" data-id="${p.id}">Rembourser</button>`:'—'}</div></div>`).join('')}`}
 
 function renderSettings(){qs('#generalEstablishmentName').value=state.settings.establishmentName}
 qs('#saveGeneralSettingsBtn').onclick=()=>{state.settings.establishmentName=qs('#generalEstablishmentName').value.trim()||'Restaurant Pro';save();toast('Paramètres enregistrés')};
@@ -403,9 +597,9 @@ document.addEventListener('click',e=>{
   if(e.target.classList.contains('resCancel')){const r=state.reservations.find(x=>x.id===Number(e.target.dataset.id));if(r){r.status='cancelled';save();renderReservations();renderTables();toast('Réservation annulée')}}
   if(e.target.classList.contains('resArrive')){const r=state.reservations.find(x=>x.id===Number(e.target.dataset.id));if(r){r.status='arrived';save();renderReservations();renderTables();if(r.tableId){setPage('pos');selectTable(state.tables.find(t=>t.id===r.tableId));toast('Table ouverte pour le client')}else toast('Client arrivé — attribuez une table')}}
   if(e.target.id==='saveResSettings'){Object.assign(state.settings,{establishmentName:qs('#sName').value.trim()||'Restaurant Pro',maxReservationsPerDay:Number(qs('#sMaxRes').value),maxCoversPerDay:Number(qs('#sMaxCovers').value),maxPartySize:Number(qs('#sMaxParty').value),minLeadMinutes:Number(qs('#sLead').value),maxAdvanceDays:Number(qs('#sAdvance').value),slotIntervalMinutes:Number(qs('#sSlot').value),defaultDurationMinutes:Number(qs('#sDuration').value),lunchEnabled:qs('#sLunchOn').value==='1',lunchStart:qs('#sLunchStart').value,lunchEnd:qs('#sLunchEnd').value,dinnerEnabled:qs('#sDinnerOn').value==='1',dinnerStart:qs('#sDinnerStart').value,dinnerEnd:qs('#sDinnerEnd').value,phoneRequired:qs('#sPhone').value==='1',allowUnassignedTable:qs('#sUnassigned').value==='1',staffCanOverrideLimits:qs('#sOverride').value==='1'});save();closeModal();renderReservations();toast('Paramètres enregistrés')}
-  if(e.target.id==='saveProduct'){const p={id:state.nextProductId++,name:qs('#pName').value.trim(),cat:qs('#pCat').value,price:Number(qs('#pPrice').value),vat:Number(qs('#pVat').value),station:qs('#pStation').value,stock:Number(qs('#pStock').value),low:Number(qs('#pLow').value),choiceLabel:qs('#pChoiceLabel').value.trim()||'Choix',choices:parseChoiceList(qs('#pChoices').value),extras:parseExtrasList(qs('#pExtras').value)};state.products.push(p);save();closeModal();renderProductsAdmin();renderCategories();renderProducts();toast('Produit créé')}
+  if(e.target.id==='saveProduct'){const p={id:state.nextProductId++,name:qs('#pName').value.trim(),cat:qs('#pCat').value,price:Number(qs('#pPrice').value),vat:Number(qs('#pVat').value),station:qs('#pStation').value,askCooking:qs('#pAskCooking')?.value==='1',askSauce:qs('#pAskSauce')?.value==='1',stock:Number(qs('#pStock').value),low:Number(qs('#pLow').value)};state.products.push(p);save();closeModal();renderProductsAdmin();renderCategories();renderProducts();toast('Produit créé')}
   if(e.target.classList.contains('editProduct')){const p=state.products.find(x=>x.id===Number(e.target.dataset.id));if(p)modal('Modifier produit',productForm(p))}
-  if(e.target.id==='saveProductEdit'){const p=state.products.find(x=>x.id===Number(e.target.dataset.id));Object.assign(p,{name:qs('#pName').value.trim(),cat:qs('#pCat').value,price:Number(qs('#pPrice').value),vat:Number(qs('#pVat').value),station:qs('#pStation').value,stock:Number(qs('#pStock').value),low:Number(qs('#pLow').value),choiceLabel:qs('#pChoiceLabel').value.trim()||'Choix',choices:parseChoiceList(qs('#pChoices').value),extras:parseExtrasList(qs('#pExtras').value)});save();closeModal();renderProductsAdmin();renderCategories();renderProducts();toast('Produit modifié')}
+  if(e.target.id==='saveProductEdit'){const p=state.products.find(x=>x.id===Number(e.target.dataset.id));Object.assign(p,{name:qs('#pName').value.trim(),cat:qs('#pCat').value,price:Number(qs('#pPrice').value),vat:Number(qs('#pVat').value),station:qs('#pStation').value,askCooking:qs('#pAskCooking')?.value==='1',askSauce:qs('#pAskSauce')?.value==='1',stock:Number(qs('#pStock').value),low:Number(qs('#pLow').value)});save();closeModal();renderProductsAdmin();renderCategories();renderProducts();toast('Produit modifié')}
   if(e.target.classList.contains('stockMinus')){const p=state.products.find(x=>x.id===Number(e.target.dataset.id));p.stock=Math.max(0,p.stock-1);save();renderStock();renderProducts()}
   if(e.target.classList.contains('stockPlus')){const p=state.products.find(x=>x.id===Number(e.target.dataset.id));p.stock++;save();renderStock();renderProducts()}
 
@@ -423,19 +617,17 @@ document.addEventListener('click',e=>{
   if(e.target.id==='saveInvoiceEdit'){const x=state.invoices.find(v=>v.id===Number(e.target.dataset.id)),v=readInvoiceForm();if(!v.customerName)return toast('Nom du client requis');if(!v.lines.length)return toast('Ajoutez une ligne');Object.assign(x,v);save();closeModal();renderInvoices();toast('Facture modifiée')}
   if(e.target.classList.contains('viewInvoice')){const x=state.invoices.find(v=>v.id===Number(e.target.dataset.id));if(x)modal(`Facture FAC-${String(x.id).padStart(4,'0')}`,invoicePreview(x))}
 
-  if(e.target.id==='confirmModifierProduct'){const p=state.products.find(x=>x.id===Number(e.target.dataset.id)),choice=qs('input[name="modifierChoice"]:checked')?.value||'',extras=qsa('.modifierExtra:checked').map(x=>({name:x.dataset.name,price:Number(x.dataset.price||0)})),itemNote=qs('#modifierNote')?.value.trim()||'';addConfiguredProduct(p,{selectedChoice:choice,selectedExtras:extras,itemNote});closeModal()}
-  if(e.target.classList.contains('refundPaymentBtn'))modal('Rembourser le paiement',managerPinModal('remboursement du paiement','refundPayment',String(e.target.dataset.id)));
-  if(e.target.id==='confirmManagerPinBtn'){const mgr=verifyManagerPin(qs('#managerPinInput').value);if(!mgr)return toast('PIN responsable incorrect');const action=e.target.dataset.action,target=e.target.dataset.target;if(action==='cancelOrder'){const total=state.cart.reduce((s,i)=>s+i.price*i.qty,0);audit('ORDER_CANCELLED',{approvedBy:mgr.name,total,tableId:state.tableId});if(state.tableId)delete state.openOrders[state.tableId];state.cart=[];state.sent=false;state.dirty=false;state.tableId=null;save();closeModal();renderTables();renderContext();renderCart();toast('Commande annulée par '+mgr.name)}if(action==='refundPayment'){const pay=state.payments.find(p=>String(p.id)===String(target));if(pay&&pay.status!=='refunded'){pay.status='refunded';pay.refundedAt=new Date().toISOString();pay.refundedBy=mgr.name;audit('PAYMENT_REFUNDED',{approvedBy:mgr.name,paymentId:pay.id,total:pay.total});save();closeModal();renderReports();toast('Paiement remboursé')}}}
-  if(e.target.classList.contains('kdsStatusBtn')){const t=state.kdsTickets.find(x=>x.id===Number(e.target.dataset.id));if(t){t.status=e.target.dataset.status;t.updatedAt=new Date().toISOString();audit('KDS_STATUS',{ticketId:t.id,status:t.status});save();renderKds()}}
-  if(e.target.classList.contains('kdsDeleteBtn')){state.kdsTickets=state.kdsTickets.filter(x=>x.id!==Number(e.target.dataset.id));save();renderKds()}
-  if(e.target.id==='saveEmployee'){const emp={id:state.nextEmployeeId++,name:qs('#empName').value.trim(),username:qs('#empUsername').value.trim().toLowerCase(),pin:qs('#empPin').value.trim(),role:qs('#empRole').value,active:qs('#empActive').value==='1'};if(!emp.name||!emp.username||!emp.pin)return toast('Nom, utilisateur et PIN requis');if(state.employees.some(x=>x.username===emp.username))return toast('Utilisateur déjà existant');state.employees.push(emp);audit('EMPLOYEE_CREATE',{employeeId:emp.id,name:emp.name,role:emp.role});save();closeModal();renderEmployees();toast('Employé créé')}
-  if(e.target.classList.contains('editEmployeeBtn')){const emp=state.employees.find(x=>x.id===Number(e.target.dataset.id));if(emp)modal('Modifier employé',employeeForm(emp))}
-  if(e.target.id==='saveEmployeeEdit'){const emp=state.employees.find(x=>x.id===Number(e.target.dataset.id)),username=qs('#empUsername').value.trim().toLowerCase();if(state.employees.some(x=>x.id!==emp.id&&x.username===username))return toast('Utilisateur déjà existant');Object.assign(emp,{name:qs('#empName').value.trim(),username,pin:qs('#empPin').value.trim(),role:qs('#empRole').value,active:qs('#empActive').value==='1'});audit('EMPLOYEE_UPDATE',{employeeId:emp.id,role:emp.role,active:emp.active});save();closeModal();renderEmployees();toast('Employé modifié')}
-
   if(e.target.id==='confirmReset'){localStorage.removeItem(STORAGE);location.reload()}
 });
 qs('#modal').onclick=e=>{if(e.target.id==='modal')closeModal()};
 
 function renderAll(){renderCash();renderTables();renderContext();renderCategories();renderProducts();renderCart();renderReservations()}
-load();if(!state.reservationDate)state.reservationDate=localDateISO();if(state.user)showApp();
+load();
+state.cart=consolidateCart(state.cart||[]);
+Object.keys(state.openOrders||{}).forEach(k=>{
+  if(state.openOrders[k]?.items)state.openOrders[k].items=consolidateCart(state.openOrders[k].items);
+});
+save();
+if(!state.reservationDate)state.reservationDate=localDateISO();
+if(state.user)showApp();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});

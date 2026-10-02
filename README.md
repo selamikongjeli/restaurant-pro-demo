@@ -1,13 +1,41 @@
-# Restaurant Pro v2.16 — Options, sécurité, KDS et employés
+# Restaurant Pro v2.17 — correction cuisson, sauce et regroupement ticket
 
-- Options/suppléments et notes cuisine par produit.
-- Les articles ne se regroupent que si leurs options sont identiques.
-- Annulation de commande et remboursement avec PIN responsable/admin.
-- Écran KDS : Nouveau → En préparation → Prêt → Servi, par Cuisine/Bar/Dessert.
-- Gestion employés : serveur, responsable, administrateur, PIN, actif/inactif.
-- Les remboursements sont exclus du chiffre d'affaires de la démo.
+## Test cuisson / sauce
+Sélectionner **Entrecôte**.
 
-Cette version reste une démonstration GitHub Pages non certifiée SCE / Peppol.
+Dans la commande doivent apparaître :
+- 🔥 Choisir cuisson
+- 🥣 Choisir sauce
+
+Exemple :
+- Cuisson : Saignant
+- Sauce : Poivre
+
+Le ticket Cuisine doit afficher :
+- 1 × Entrecôte
+- 🔥 Cuisson : Saignant
+- 🥣 Sauce : Poivre
+
+## Test regroupement
+Pointer :
+1. Coca-Cola
+2. Jupiler
+3. Coca-Cola
+
+Avant envoi ET sur le ticket Bar :
+- **2 × Coca-Cola**
+- **1 × Jupiler**
+
+## Produits avec options différentes
+Les articles ne sont regroupés que si cuisson et sauce sont identiques :
+- 2 Entrecôtes / Saignant / Poivre → 2 × Entrecôte
+- 1 Saignant / Poivre + 1 Bien cuit / Béarnaise → deux lignes.
+
+Les séparations manuelles restent respectées.
+
+# Restaurant Pro v2.16 — Version de test
+
+Test : Coca → Bière → Coca doit donner 2 × Coca + 1 × Bière avant envoi et sur le ticket.
 
 # Restaurant Pro v2.15 — Regroupement automatique des articles
 
