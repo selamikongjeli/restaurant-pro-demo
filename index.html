@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
-<title>Restaurant Pro v2.17 — Démo GitHub</title>
+<title>Restaurant Pro v2.18 — Démo GitHub</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=217">
+<link rel="stylesheet" href="style.css?v=218">
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
@@ -24,7 +24,7 @@
 <header class="topbar">
   <div>
     <div class="brand">Restaurant <span>Pro</span></div>
-    <div class="sub">v2.17 · Démo gratuite GitHub Pages</div>
+    <div class="sub">v2.18 · Démo gratuite GitHub Pages</div>
   </div>
   <div class="top-actions">
     <span id="cashBadge" class="badge closed">Caisse fermée</span>
@@ -38,6 +38,7 @@
   <button class="navbtn active" data-page="pos">Caisse</button>
   <button class="navbtn nav-reservations" data-page="reservations">📅 Réservations</button>
   <button class="navbtn manager-only" data-page="products">Produits</button>
+  <button class="navbtn manager-only" data-page="kitchen-options">Options cuisine</button>
   <button class="navbtn manager-only" data-page="stock">Stock</button>
   <button class="navbtn manager-only" data-page="reports">Rapports</button>
   <button class="navbtn manager-only" data-page="accounting">Comptabilité</button>
@@ -146,6 +147,23 @@
   <div id="productsAdmin" class="admin-list"></div>
 </section>
 
+
+<section id="page-kitchen-options" class="page hidden manager-only">
+  <div class="section-title">
+    <div><h1>Options cuisine</h1><div class="muted">Accompagnements et messages rapides</div></div>
+  </div>
+  <div class="accounting-grid">
+    <section class="report-card">
+      <div class="section-title"><h2>Familles d’accompagnements</h2><button id="newAccompanimentGroupBtn" class="primary">+ Nouvelle famille</button></div>
+      <div id="accompanimentGroupsList" class="admin-list"></div>
+    </section>
+    <section class="report-card">
+      <div class="section-title"><h2>Messages rapides cuisine</h2><button id="newKitchenMessageBtn" class="primary">+ Nouveau message</button></div>
+      <div id="kitchenMessagesList" class="admin-list"></div>
+    </section>
+  </div>
+</section>
+
 <section id="page-stock" class="page hidden manager-only">
   <div class="section-title"><h1>Stock</h1><span class="muted">Quantités de démonstration</span></div>
   <div id="stockList" class="admin-list"></div>
@@ -190,6 +208,6 @@
 </div>
 <button id="floatingReservationsBtn" class="floating-reservations">📅 Réservations</button>
 <div id="toast"></div>
-<script src="app.js?v=217"></script>
+<script src="app.js?v=218"></script>
 </body>
 </html>

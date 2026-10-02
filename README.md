@@ -1,3 +1,13 @@
+# Restaurant Pro v2.18 — Accompagnements et messages cuisine
+
+- Création article : cuisson oui/non, sauce oui/non, famille d’accompagnements, messages cuisine oui/non.
+- Nouvelle page Options cuisine.
+- Familles d’accompagnements personnalisables.
+- Messages rapides personnalisables.
+- Message libre par article.
+- Ticket cuisine affiche cuisson, sauce, accompagnement et message.
+- Regroupement uniquement si toutes les options sont identiques.
+
 # Restaurant Pro v2.17 — correction cuisson, sauce et regroupement ticket
 
 ## Test cuisson / sauce

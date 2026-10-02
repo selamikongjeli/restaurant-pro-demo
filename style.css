@@ -267,3 +267,14 @@ main{padding:18px}
 @media(max-width:520px){
   .item-options{grid-template-columns:1fr}
 }
+
+.item-extra-options{margin-top:8px;display:grid;gap:7px}
+.item-extra-options select,.item-extra-options input{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px;min-height:42px}
+.message-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.quick-message{border:1px solid #fde68a;background:#fffbeb;color:#92400e;border-radius:999px;padding:6px 9px;font-size:11px;font-weight:900}
+.quick-message.active{background:#f59e0b;color:#fff;border-color:#f59e0b}
+.custom-note-btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 9px;font-weight:800}
+.ticket-accompaniment,.ticket-note{margin:3px 0 5px 20px;font-size:12px;font-weight:800}
+.ticket-note{color:#991b1b}
+.group-items{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.group-chip{background:#f3f4f6;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:800}

@@ -26,6 +26,9 @@ const defaults={
   ],
   cart:[],openOrders:{},payments:[],reservations:[],nextReservationId:1,nextProductId:13,
   expenses:[],suppliers:[],invoices:[],nextExpenseId:1,nextSupplierId:1,nextInvoiceId:1,
+  accompanimentGroups:[{id:1,name:'Accompagnements classiques',items:['Frites','Croquettes','Purée','Pommes vapeur','Salade','Légumes','Riz']}],
+  kitchenMessages:['Sans salade','Sans frites','Sans sauce','Sauce à part','Bien chaud','Allergie'],
+  nextAccompanimentGroupId:2,
   reservationDate:null,reservationSearch:'',reservationStatusFilter:'all',
   settings:{
     establishmentName:'Restaurant Pro',
@@ -51,8 +54,13 @@ function load(){
     state.products=(state.products||[]).map(p=>({
       ...p,
       askCooking:p.askCooking!==undefined?Boolean(p.askCooking):productNeedsCooking(p),
-      askSauce:p.askSauce!==undefined?Boolean(p.askSauce):productNeedsSauce(p)
+      askSauce:p.askSauce!==undefined?Boolean(p.askSauce):productNeedsSauce(p),
+      accompanimentGroupId:p.accompanimentGroupId!==undefined?p.accompanimentGroupId:(p.cat==='Plats'?1:null),
+      allowKitchenMessage:p.allowKitchenMessage!==undefined?Boolean(p.allowKitchenMessage):true
     }));
+    state.accompanimentGroups=Array.isArray(state.accompanimentGroups)&&state.accompanimentGroups.length?state.accompanimentGroups:structuredClone(defaults.accompanimentGroups);
+    state.kitchenMessages=Array.isArray(state.kitchenMessages)&&state.kitchenMessages.length?state.kitchenMessages:[...defaults.kitchenMessages];
+    state.nextAccompanimentGroupId=Number(state.nextAccompanimentGroupId||2);
   }catch{}
 }
 function toast(msg){const t=qs('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
@@ -89,6 +97,7 @@ function setPage(name){
   if(floating)floating.classList.toggle('hidden',name==='reservations');
   if(name==='reservations')renderReservations();
   if(name==='products')renderProductsAdmin();
+  if(name==='kitchen-options')renderKitchenOptions();
   if(name==='stock')renderStock();
   if(name==='reports')renderReports();
   if(name==='accounting')renderAccounting();
@@ -173,7 +182,7 @@ function mergeSegmentItems(segment){
   segment.forEach(item=>{
     // Un même article est regroupé seulement s'il appartient au même service.
     // Cela évite de mélanger un article placé volontairement dans un autre service.
-    const key=`${item.id}|${item.service||''}|${item.station||''}|${item.price}|${item.cooking||''}|${item.sauce||''}`;
+    const key=`${item.id}|${item.service||''}|${item.station||''}|${item.price}|${item.cooking||''}|${item.sauce||''}|${item.accompaniment||''}|${item.kitchenNote||''}`;
     if(byKey.has(key)){
       const target=byKey.get(key);
       target.qty=Number(target.qty||0)+Number(item.qty||0);
@@ -226,7 +235,9 @@ function addProduct(p){
       separatorAfter:false,
       service:defaultService,
       cooking:'',
-      sauce:''
+      sauce:'',
+      accompaniment:'',
+      kitchenNote:''
     });
   }else{
     const start=currentManualSegmentStart();
@@ -242,7 +253,9 @@ function addProduct(p){
       separatorAfter:false,
       service:defaultService,
       cooking:'',
-      sauce:''
+      sauce:'',
+      accompaniment:'',
+      kitchenNote:''
     });
   }
 
@@ -258,135 +271,62 @@ function changeQty(i,d){
   state.cart=consolidateCart(state.cart);
   state.sent=false;state.dirty=true;save();renderCart()
 }
+function getAccompanimentGroup(id){
+  return state.accompanimentGroups.find(g=>Number(g.id)===Number(id))||null;
+}
 function renderCart(){
-  const w=qs('#cart');
-  w.innerHTML='';
-
-  if(!state.cart.length){
-    w.innerHTML='<div class="empty">Aucun article</div>';
-  }
+  const w=qs('#cart');w.innerHTML='';
+  if(!state.cart.length)w.innerHTML='<div class="empty">Aucun article</div>';
 
   state.cart.forEach((i,idx)=>{
-    const d=document.createElement('div');
-    d.className='cart-item';
-
+    const d=document.createElement('div');d.className='cart-item';
     const cookingValues=['Bleu','Saignant','À point','Bien cuit'];
     const sauceValues=['Sans sauce','Béarnaise','Poivre','Champignons','Liégeoise','Mayonnaise','Autre'];
+    const group=getAccompanimentGroup(i.accompanimentGroupId);
 
-    const cookingSelect=i.askCooking?`
-      <select class="cooking">
-        <option value="">🔥 Choisir cuisson</option>
-        ${cookingValues.map(v=>`<option value="${v}" ${i.cooking===v?'selected':''}>${v}</option>`).join('')}
-      </select>`:'';
+    const cookingSelect=i.askCooking?`<select class="cooking"><option value="">🔥 Choisir cuisson</option>${cookingValues.map(v=>`<option value="${v}" ${i.cooking===v?'selected':''}>${v}</option>`).join('')}</select>`:'';
+    const sauceSelect=i.askSauce?`<select class="sauce"><option value="">🥣 Choisir sauce</option>${sauceValues.map(v=>`<option value="${v}" ${i.sauce===v?'selected':''}>${v}</option>`).join('')}</select>`:'';
+    const accompanimentSelect=group?`<select class="accompaniment"><option value="">🍟 Choisir accompagnement</option>${group.items.map(v=>`<option value="${esc(v)}" ${i.accompaniment===v?'selected':''}>${esc(v)}</option>`).join('')}</select>`:'';
+    const quickMessages=i.allowKitchenMessage?`<div class="message-row">${state.kitchenMessages.map(m=>`<button type="button" class="quick-message ${i.kitchenNote===m?'active':''}" data-message="${esc(m)}">${esc(m)}</button>`).join('')}<button type="button" class="custom-note-btn">✍️ Message libre</button></div>`:'';
+    const summaries=[];
+    if(i.cooking)summaries.push(`🔥 Cuisson : ${esc(i.cooking)}`);
+    if(i.sauce)summaries.push(`🥣 Sauce : ${esc(i.sauce)}`);
+    if(i.accompaniment)summaries.push(`🍟 Accompagnement : ${esc(i.accompaniment)}`);
+    if(i.kitchenNote)summaries.push(`💬 ${esc(i.kitchenNote)}`);
 
-    const sauceSelect=i.askSauce?`
-      <select class="sauce">
-        <option value="">🥣 Choisir sauce</option>
-        ${sauceValues.map(v=>`<option value="${v}" ${i.sauce===v?'selected':''}>${v}</option>`).join('')}
-      </select>`:'';
+    d.innerHTML=`<div class="item-top"><div><b>${esc(i.name)}</b><div class="muted">${esc(i.station)} · TVA ${i.vat}%</div></div><b>${money(i.price*i.qty)}</b></div>
+      <div class="qty"><button class="minus">−</button><b>${i.qty}</b><button class="plus">+</button></div>
+      ${(i.askCooking||i.askSauce)?`<div class="item-options">${cookingSelect}${sauceSelect}</div>`:''}
+      ${group?`<div class="item-extra-options">${accompanimentSelect}</div>`:''}
+      ${quickMessages}
+      ${summaries.length?`<div class="option-summary">${summaries.join(' · ')}</div>`:''}
+      <div class="item-controls"><select class="service"><option>Entrée</option><option>Plat</option><option>Dessert</option><option>Boisson</option></select><button class="separator ${i.separatorAfter?'active':''}">${i.separatorAfter?'✓ Retirer ligne':'➖ Ligne après'}</button></div>`;
 
-    const optionSummary=(i.cooking||i.sauce)?`
-      <div class="option-summary">
-        ${i.cooking?`🔥 Cuisson : ${esc(i.cooking)}`:''}
-        ${i.cooking&&i.sauce?' · ':''}
-        ${i.sauce?`🥣 Sauce : ${esc(i.sauce)}`:''}
-      </div>`:'';
+    const service=d.querySelector('.service');service.value=i.service||'Plat';
+    service.onchange=e=>{i.service=e.target.value;state.cart=consolidateCart(state.cart);state.sent=false;state.dirty=true;save();renderCart()};
+    const cooking=d.querySelector('.cooking');if(cooking)cooking.onchange=e=>{i.cooking=e.target.value;state.cart=consolidateCart(state.cart);state.sent=false;state.dirty=true;save();renderCart()};
+    const sauce=d.querySelector('.sauce');if(sauce)sauce.onchange=e=>{i.sauce=e.target.value;state.cart=consolidateCart(state.cart);state.sent=false;state.dirty=true;save();renderCart()};
+    const accompaniment=d.querySelector('.accompaniment');if(accompaniment)accompaniment.onchange=e=>{i.accompaniment=e.target.value;state.cart=consolidateCart(state.cart);state.sent=false;state.dirty=true;save();renderCart()};
 
-    d.innerHTML=`
-      <div class="item-top">
-        <div>
-          <b>${esc(i.name)}</b>
-          <div class="muted">${esc(i.station)} · TVA ${i.vat}%</div>
-        </div>
-        <b>${money(i.price*i.qty)}</b>
-      </div>
-
-      <div class="qty">
-        <button class="minus">−</button>
-        <b>${i.qty}</b>
-        <button class="plus">+</button>
-      </div>
-
-      ${(i.askCooking||i.askSauce)?`<div class="item-options">${cookingSelect}${sauceSelect}</div>${optionSummary}`:''}
-
-      <div class="item-controls">
-        <select class="service">
-          <option>Entrée</option>
-          <option>Plat</option>
-          <option>Dessert</option>
-          <option>Boisson</option>
-        </select>
-        <button class="separator ${i.separatorAfter?'active':''}">
-          ${i.separatorAfter?'✓ Retirer ligne':'➖ Ligne après'}
-        </button>
-      </div>`;
-
-    const service=d.querySelector('.service');
-    service.value=i.service||'Plat';
-    service.onchange=e=>{
-      i.service=e.target.value;
-      state.cart=consolidateCart(state.cart);
-      state.sent=false;
-      state.dirty=true;
-      save();
-      renderCart();
-    };
-
-    const cooking=d.querySelector('.cooking');
-    if(cooking){
-      cooking.onchange=e=>{
-        i.cooking=e.target.value;
-        state.cart=consolidateCart(state.cart);
-        state.sent=false;
-        state.dirty=true;
-        save();
-        renderCart();
-      };
-    }
-
-    const sauce=d.querySelector('.sauce');
-    if(sauce){
-      sauce.onchange=e=>{
-        i.sauce=e.target.value;
-        state.cart=consolidateCart(state.cart);
-        state.sent=false;
-        state.dirty=true;
-        save();
-        renderCart();
-      };
-    }
+    d.querySelectorAll('.quick-message').forEach(btn=>btn.onclick=()=>{const msg=btn.dataset.message;i.kitchenNote=i.kitchenNote===msg?'':msg;state.cart=consolidateCart(state.cart);state.sent=false;state.dirty=true;save();renderCart()});
+    const customBtn=d.querySelector('.custom-note-btn');if(customBtn)customBtn.onclick=()=>modal('Message cuisine',`<div class="form-grid"><label class="span3">Message pour la cuisine<input id="customKitchenNote" value="${esc(i.kitchenNote||'')}" placeholder="Ex. sans salade, sauce à part..."></label><button id="saveCustomKitchenNote" data-cart-index="${idx}" class="primary span3">Enregistrer le message</button></div>`);
 
     d.querySelector('.minus').onclick=()=>changeQty(i,-1);
     d.querySelector('.plus').onclick=()=>changeQty(i,1);
-    d.querySelector('.separator').onclick=()=>{
-      i.separatorAfter=!i.separatorAfter;
-      state.sent=false;
-      state.dirty=true;
-      save();
-      renderCart();
-    };
-
+    d.querySelector('.separator').onclick=()=>{i.separatorAfter=!i.separatorAfter;state.sent=false;state.dirty=true;save();renderCart()};
     w.appendChild(d);
-
-    if(i.separatorAfter&&idx<state.cart.length-1){
-      const sep=document.createElement('div');
-      sep.className='manual-sep';
-      w.appendChild(sep);
-    }
+    if(i.separatorAfter&&idx<state.cart.length-1){const sep=document.createElement('div');sep.className='manual-sep';w.appendChild(sep)}
   });
 
   const total=state.cart.reduce((s,i)=>s+i.price*i.qty,0);
-  qs('#subtotal').textContent=money(total);
-  qs('#total').textContent=money(total);
-  qs('#payBtn').textContent=`PAYER ${money(total)}`;
+  qs('#subtotal').textContent=money(total);qs('#total').textContent=money(total);qs('#payBtn').textContent=`PAYER ${money(total)}`;
   qs('#payBtn').disabled=!state.cashOpen||!state.sent||state.dirty||!state.cart.length;
-  qs('#orderStatus').classList.toggle('hidden',!state.sent);
-  qs('#orderStatus').textContent=state.sent?'✓ Commande envoyée — prête à encaisser':'';
+  qs('#orderStatus').classList.toggle('hidden',!state.sent);qs('#orderStatus').textContent=state.sent?'✓ Commande envoyée — prête à encaisser':'';
 }
 qs('#clearCartBtn').onclick=()=>{if(!state.cart.length)return;state.cart=[];state.sent=false;state.dirty=false;save();renderCart()};
 
 function ticketItemKey(i){
-  return `${i.id}|${i.service||''}|${i.station||''}|${i.price}|${i.cooking||''}|${i.sauce||''}`;
+  return `${i.id}|${i.service||''}|${i.station||''}|${i.price}|${i.cooking||''}|${i.sauce||''}|${i.accompaniment||''}|${i.kitchenNote||''}`;
 }
 function regroupTicketSegment(items){
   const out=[];
@@ -418,7 +358,10 @@ function ticketOptions(i){
   const parts=[];
   if(i.cooking)parts.push(`🔥 Cuisson : ${esc(i.cooking)}`);
   if(i.sauce)parts.push(`🥣 Sauce : ${esc(i.sauce)}`);
-  return parts.length?`<div class="ticket-options">${parts.join(' · ')}</div>`:'';
+  if(i.accompaniment)parts.push(`🍟 Accompagnement : ${esc(i.accompaniment)}`);
+  const options=parts.length?`<div class="ticket-options">${parts.join(' · ')}</div>`:'';
+  const note=i.kitchenNote?`<div class="ticket-note">💬 ${esc(i.kitchenNote)}</div>`:'';
+  return options+note;
 }
 function ticketItemHtml(i){
   return `<div class="ticket-line"><b>${i.qty} × ${esc(i.name)}</b>${ticketOptions(i)}</div>${i.separatorAfter?'<div class="sep"></div>':''}`;
@@ -538,6 +481,20 @@ qs('#reservationSettingsBtn').onclick=()=>modal('Paramètres réservations',sett
 qs('#resPrevDayBtn').onclick=()=>{state.reservationDate=shiftDate(state.reservationDate,-1);save();renderReservations()};qs('#resTodayBtn').onclick=()=>{state.reservationDate=localDateISO();save();renderReservations()};qs('#resNextDayBtn').onclick=()=>{state.reservationDate=shiftDate(state.reservationDate,1);save();renderReservations()};
 qs('#reservationDate').onchange=e=>{state.reservationDate=e.target.value;save();renderReservations()};qs('#reservationSearch').oninput=e=>{state.reservationSearch=e.target.value;renderReservations()};qs('#reservationStatusFilter').onchange=e=>{state.reservationStatusFilter=e.target.value;renderReservations()};
 
+function accompanimentGroupForm(group=null){
+  const g=group||{};
+  return `<div class="form-grid"><label class="span3">Nom de la famille<input id="agName" value="${esc(g.name||'')}"></label><label class="span3">Accompagnements (un par ligne)<textarea id="agItems" rows="8">${esc((g.items||[]).join('\n'))}</textarea></label><button id="${group?'saveAccompanimentGroupEdit':'saveAccompanimentGroup'}" ${group?`data-id="${group.id}"`:''} class="primary span3">${group?'Enregistrer':'Créer la famille'}</button></div>`;
+}
+function kitchenMessageForm(message=null,index=null){
+  return `<div class="form-grid"><label class="span3">Message rapide<input id="kmText" value="${esc(message||'')}"></label><button id="${index!==null?'saveKitchenMessageEdit':'saveKitchenMessage'}" ${index!==null?`data-index="${index}"`:''} class="primary span3">${index!==null?'Enregistrer':'Ajouter le message'}</button></div>`;
+}
+function renderKitchenOptions(){
+  qs('#accompanimentGroupsList').innerHTML=state.accompanimentGroups.map(g=>`<div class="admin-row"><div><b>${esc(g.name)}</b><div class="group-items">${g.items.map(i=>`<span class="group-chip">${esc(i)}</span>`).join('')}</div></div><div>${g.items.length} choix</div><div></div><div><button class="editAccompanimentGroup" data-id="${g.id}">Modifier</button> <button class="deleteAccompanimentGroup" data-id="${g.id}">Supprimer</button></div></div>`).join('')||'<div class="empty">Aucune famille</div>';
+  qs('#kitchenMessagesList').innerHTML=state.kitchenMessages.map((m,idx)=>`<div class="admin-row"><div><b>${esc(m)}</b></div><div></div><div></div><div><button class="editKitchenMessage" data-index="${idx}">Modifier</button> <button class="deleteKitchenMessage" data-index="${idx}">Supprimer</button></div></div>`).join('')||'<div class="empty">Aucun message rapide</div>';
+}
+qs('#newAccompanimentGroupBtn').onclick=()=>modal('Nouvelle famille d’accompagnements',accompanimentGroupForm());
+qs('#newKitchenMessageBtn').onclick=()=>modal('Nouveau message cuisine',kitchenMessageForm());
+
 function renderProductsAdmin(){
   qs('#productsAdmin').innerHTML=state.products.map(p=>`<div class="admin-row"><div><b>${esc(p.name)}</b><div class="muted">${esc(p.cat)} · ${esc(p.station)}</div></div><div>${money(p.price)}</div><div>TVA ${p.vat}%</div><div><button class="editProduct" data-id="${p.id}">Modifier</button></div></div>`).join('')
 }
@@ -552,6 +509,8 @@ function productForm(p=null){
     <label>Station<select id="pStation">${['Cuisine','Bar','Dessert'].map(c=>`<option ${x.station===c?'selected':''}>${c}</option>`).join('')}</select></label>
     <label>Demander cuisson<select id="pAskCooking"><option value="0" ${!x.askCooking?'selected':''}>Non</option><option value="1" ${x.askCooking?'selected':''}>Oui</option></select></label>
     <label>Demander sauce<select id="pAskSauce"><option value="0" ${!x.askSauce?'selected':''}>Non</option><option value="1" ${x.askSauce?'selected':''}>Oui</option></select></label>
+    <label>Famille accompagnements<select id="pAccompanimentGroup"><option value="">Aucune</option>${state.accompanimentGroups.map(g=>`<option value="${g.id}" ${Number(x.accompanimentGroupId)===Number(g.id)?'selected':''}>${esc(g.name)}</option>`).join('')}</select></label>
+    <label>Messages cuisine<select id="pAllowKitchenMessage"><option value="1" ${x.allowKitchenMessage!==false?'selected':''}>Oui</option><option value="0" ${x.allowKitchenMessage===false?'selected':''}>Non</option></select></label>
     <label>Stock<input id="pStock" type="number" value="${x.stock??0}"></label>
     <label>Seuil bas<input id="pLow" type="number" value="${x.low??5}"></label>
     <button id="${p?'saveProductEdit':'saveProduct'}" ${p?`data-id="${p.id}"`:''} class="primary span3">${p?'Enregistrer':'Créer'}</button>
@@ -597,9 +556,9 @@ document.addEventListener('click',e=>{
   if(e.target.classList.contains('resCancel')){const r=state.reservations.find(x=>x.id===Number(e.target.dataset.id));if(r){r.status='cancelled';save();renderReservations();renderTables();toast('Réservation annulée')}}
   if(e.target.classList.contains('resArrive')){const r=state.reservations.find(x=>x.id===Number(e.target.dataset.id));if(r){r.status='arrived';save();renderReservations();renderTables();if(r.tableId){setPage('pos');selectTable(state.tables.find(t=>t.id===r.tableId));toast('Table ouverte pour le client')}else toast('Client arrivé — attribuez une table')}}
   if(e.target.id==='saveResSettings'){Object.assign(state.settings,{establishmentName:qs('#sName').value.trim()||'Restaurant Pro',maxReservationsPerDay:Number(qs('#sMaxRes').value),maxCoversPerDay:Number(qs('#sMaxCovers').value),maxPartySize:Number(qs('#sMaxParty').value),minLeadMinutes:Number(qs('#sLead').value),maxAdvanceDays:Number(qs('#sAdvance').value),slotIntervalMinutes:Number(qs('#sSlot').value),defaultDurationMinutes:Number(qs('#sDuration').value),lunchEnabled:qs('#sLunchOn').value==='1',lunchStart:qs('#sLunchStart').value,lunchEnd:qs('#sLunchEnd').value,dinnerEnabled:qs('#sDinnerOn').value==='1',dinnerStart:qs('#sDinnerStart').value,dinnerEnd:qs('#sDinnerEnd').value,phoneRequired:qs('#sPhone').value==='1',allowUnassignedTable:qs('#sUnassigned').value==='1',staffCanOverrideLimits:qs('#sOverride').value==='1'});save();closeModal();renderReservations();toast('Paramètres enregistrés')}
-  if(e.target.id==='saveProduct'){const p={id:state.nextProductId++,name:qs('#pName').value.trim(),cat:qs('#pCat').value,price:Number(qs('#pPrice').value),vat:Number(qs('#pVat').value),station:qs('#pStation').value,askCooking:qs('#pAskCooking')?.value==='1',askSauce:qs('#pAskSauce')?.value==='1',stock:Number(qs('#pStock').value),low:Number(qs('#pLow').value)};state.products.push(p);save();closeModal();renderProductsAdmin();renderCategories();renderProducts();toast('Produit créé')}
+  if(e.target.id==='saveProduct'){const p={id:state.nextProductId++,name:qs('#pName').value.trim(),cat:qs('#pCat').value,price:Number(qs('#pPrice').value),vat:Number(qs('#pVat').value),station:qs('#pStation').value,askCooking:qs('#pAskCooking')?.value==='1',askSauce:qs('#pAskSauce')?.value==='1',accompanimentGroupId:qs('#pAccompanimentGroup')?.value?Number(qs('#pAccompanimentGroup').value):null,allowKitchenMessage:qs('#pAllowKitchenMessage')?.value!=='0',stock:Number(qs('#pStock').value),low:Number(qs('#pLow').value)};state.products.push(p);save();closeModal();renderProductsAdmin();renderCategories();renderProducts();toast('Produit créé')}
   if(e.target.classList.contains('editProduct')){const p=state.products.find(x=>x.id===Number(e.target.dataset.id));if(p)modal('Modifier produit',productForm(p))}
-  if(e.target.id==='saveProductEdit'){const p=state.products.find(x=>x.id===Number(e.target.dataset.id));Object.assign(p,{name:qs('#pName').value.trim(),cat:qs('#pCat').value,price:Number(qs('#pPrice').value),vat:Number(qs('#pVat').value),station:qs('#pStation').value,askCooking:qs('#pAskCooking')?.value==='1',askSauce:qs('#pAskSauce')?.value==='1',stock:Number(qs('#pStock').value),low:Number(qs('#pLow').value)});save();closeModal();renderProductsAdmin();renderCategories();renderProducts();toast('Produit modifié')}
+  if(e.target.id==='saveProductEdit'){const p=state.products.find(x=>x.id===Number(e.target.dataset.id));Object.assign(p,{name:qs('#pName').value.trim(),cat:qs('#pCat').value,price:Number(qs('#pPrice').value),vat:Number(qs('#pVat').value),station:qs('#pStation').value,askCooking:qs('#pAskCooking')?.value==='1',askSauce:qs('#pAskSauce')?.value==='1',accompanimentGroupId:qs('#pAccompanimentGroup')?.value?Number(qs('#pAccompanimentGroup').value):null,allowKitchenMessage:qs('#pAllowKitchenMessage')?.value!=='0',stock:Number(qs('#pStock').value),low:Number(qs('#pLow').value)});save();closeModal();renderProductsAdmin();renderCategories();renderProducts();toast('Produit modifié')}
   if(e.target.classList.contains('stockMinus')){const p=state.products.find(x=>x.id===Number(e.target.dataset.id));p.stock=Math.max(0,p.stock-1);save();renderStock();renderProducts()}
   if(e.target.classList.contains('stockPlus')){const p=state.products.find(x=>x.id===Number(e.target.dataset.id));p.stock++;save();renderStock();renderProducts()}
 
@@ -617,6 +576,15 @@ document.addEventListener('click',e=>{
   if(e.target.id==='saveInvoiceEdit'){const x=state.invoices.find(v=>v.id===Number(e.target.dataset.id)),v=readInvoiceForm();if(!v.customerName)return toast('Nom du client requis');if(!v.lines.length)return toast('Ajoutez une ligne');Object.assign(x,v);save();closeModal();renderInvoices();toast('Facture modifiée')}
   if(e.target.classList.contains('viewInvoice')){const x=state.invoices.find(v=>v.id===Number(e.target.dataset.id));if(x)modal(`Facture FAC-${String(x.id).padStart(4,'0')}`,invoicePreview(x))}
 
+  if(e.target.id==='saveCustomKitchenNote'){const idx=Number(e.target.dataset.cartIndex),item=state.cart[idx];if(item){item.kitchenNote=qs('#customKitchenNote').value.trim();state.cart=consolidateCart(state.cart);save();closeModal();renderCart();toast('Message cuisine enregistré')}}
+  if(e.target.id==='saveAccompanimentGroup'){const name=qs('#agName').value.trim(),items=qs('#agItems').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);if(!name)return toast('Nom requis');state.accompanimentGroups.push({id:state.nextAccompanimentGroupId++,name,items});save();closeModal();renderKitchenOptions();toast('Famille créée')}
+  if(e.target.classList.contains('editAccompanimentGroup')){const g=state.accompanimentGroups.find(x=>Number(x.id)===Number(e.target.dataset.id));if(g)modal('Modifier famille',accompanimentGroupForm(g))}
+  if(e.target.id==='saveAccompanimentGroupEdit'){const g=state.accompanimentGroups.find(x=>Number(x.id)===Number(e.target.dataset.id));if(g){g.name=qs('#agName').value.trim();g.items=qs('#agItems').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);save();closeModal();renderKitchenOptions();toast('Famille modifiée')}}
+  if(e.target.classList.contains('deleteAccompanimentGroup')){const id=Number(e.target.dataset.id);state.accompanimentGroups=state.accompanimentGroups.filter(x=>Number(x.id)!==id);state.products.forEach(p=>{if(Number(p.accompanimentGroupId)===id)p.accompanimentGroupId=null});save();renderKitchenOptions();renderProductsAdmin();toast('Famille supprimée')}
+  if(e.target.id==='saveKitchenMessage'){const m=qs('#kmText').value.trim();if(!m)return toast('Message requis');state.kitchenMessages.push(m);save();closeModal();renderKitchenOptions();toast('Message ajouté')}
+  if(e.target.classList.contains('editKitchenMessage')){const idx=Number(e.target.dataset.index);modal('Modifier message',kitchenMessageForm(state.kitchenMessages[idx],idx))}
+  if(e.target.id==='saveKitchenMessageEdit'){const idx=Number(e.target.dataset.index),m=qs('#kmText').value.trim();if(m)state.kitchenMessages[idx]=m;save();closeModal();renderKitchenOptions();toast('Message modifié')}
+  if(e.target.classList.contains('deleteKitchenMessage')){state.kitchenMessages.splice(Number(e.target.dataset.index),1);save();renderKitchenOptions();toast('Message supprimé')}
   if(e.target.id==='confirmReset'){localStorage.removeItem(STORAGE);location.reload()}
 });
 qs('#modal').onclick=e=>{if(e.target.id==='modal')closeModal()};
