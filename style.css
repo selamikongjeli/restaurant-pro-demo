@@ -278,3 +278,18 @@ main{padding:18px}
 .ticket-note{color:#991b1b}
 .group-items{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
 .group-chip{background:#f3f4f6;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:800}
+
+
+/* ===== v2.19 : fenêtre options automatique au pointage ===== */
+.product-configurator{display:grid;gap:14px;margin-top:12px}
+.configurator-product{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;background:#f8fafc;border:1px solid var(--line);border-radius:12px}
+.configurator-product b{font-size:18px}
+.configurator-section{border:1px solid var(--line);border-radius:12px;padding:12px}
+.configurator-section h4{margin:0 0 9px;font-size:14px}
+.configurator-options{display:flex;flex-wrap:wrap;gap:8px}
+.config-option{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 12px;font-weight:800}
+.config-option.active{background:#0f766e;color:#fff;border-color:#0f766e}
+.configurator-note{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;min-height:45px;margin-top:9px}
+.configurator-footer{display:grid;grid-template-columns:1fr 2fr;gap:9px}
+.configurator-footer button{min-height:50px;font-weight:900}
+@media(max-width:560px){.configurator-footer{grid-template-columns:1fr}}

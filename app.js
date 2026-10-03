@@ -2,6 +2,7 @@
 const money=n=>new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR'}).format(Number(n||0));
 const qs=s=>document.querySelector(s),qsa=s=>[...document.querySelectorAll(s)];
 const STORAGE='restaurantProGithubDemoV211';
+let pendingProductConfig=null;
 
 const defaults={
   user:null,cashOpen:false,cashOpening:0,currentMode:'table',tableId:null,category:'Plats',sent:false,dirty:false,payment:'card',
@@ -221,49 +222,53 @@ function currentManualSegmentStart(){
   return 0;
 }
 
+function productRequiresConfiguration(p){
+  // Le popup s'ouvre lorsqu'un choix immédiat est réellement demandé.
+  // Un simple message cuisine autorisé ne force pas le popup à lui seul.
+  return Boolean(p.askCooking || p.askSauce || p.accompanimentGroupId);
+}
+function defaultServiceForProduct(p){
+  return ({Entrées:'Entrée',Plats:'Plat',Desserts:'Dessert',Boissons:'Boisson'}[p.cat]||'Plat');
+}
+function productConfiguratorHtml(p){
+  const group=getAccompanimentGroup(p.accompanimentGroupId);
+  const cookingValues=['Bleu','Saignant','À point','Bien cuit'];
+  const sauceValues=['Sans sauce','Béarnaise','Poivre','Champignons','Liégeoise','Mayonnaise','Autre'];
+
+  return `<div class="product-configurator">
+    <div class="configurator-product">
+      <div><b>${esc(p.name)}</b><div class="muted">${esc(p.cat)} · ${money(p.price)}</div></div>
+      <b>${money(p.price)}</b>
+    </div>
+
+    ${p.askCooking?`<div class="configurator-section"><h4>🔥 Cuisson</h4><div class="configurator-options">${cookingValues.map(v=>`<button type="button" class="config-option config-cooking" data-value="${esc(v)}">${esc(v)}</button>`).join('')}</div></div>`:''}
+
+    ${p.askSauce?`<div class="configurator-section"><h4>🥣 Sauce</h4><div class="configurator-options">${sauceValues.map(v=>`<button type="button" class="config-option config-sauce" data-value="${esc(v)}">${esc(v)}</button>`).join('')}</div></div>`:''}
+
+    ${group?`<div class="configurator-section"><h4>🍟 Accompagnement</h4><div class="configurator-options">${group.items.map(v=>`<button type="button" class="config-option config-accompaniment" data-value="${esc(v)}">${esc(v)}</button>`).join('')}</div></div>`:''}
+
+    ${p.allowKitchenMessage?`<div class="configurator-section"><h4>💬 Message cuisine <span class="muted">(facultatif)</span></h4><div class="configurator-options">${state.kitchenMessages.map(v=>`<button type="button" class="config-option config-message" data-value="${esc(v)}">${esc(v)}</button>`).join('')}</div><input id="configCustomMessage" class="configurator-note" placeholder="Ou écrire un message libre..."></div>`:''}
+
+    <div class="configurator-footer"><button id="cancelProductConfig" class="secondary">Annuler</button><button id="confirmProductConfig" class="primary">Ajouter à la commande</button></div>
+  </div>`;
+}
+function addConfiguredProduct(p,config={}){
+  if(p.stock<=0)return toast('Produit en rupture');
+  const item={...p,qty:1,separatorAfter:false,service:defaultServiceForProduct(p),cooking:config.cooking||'',sauce:config.sauce||'',accompaniment:config.accompaniment||'',kitchenNote:config.kitchenNote||''};
+  const start=currentManualSegmentStart();
+  const existing=state.cart.slice(start).find(i=>Number(i.id)===Number(item.id)&&(i.service||'')===item.service&&(i.cooking||'')===item.cooking&&(i.sauce||'')===item.sauce&&(i.accompaniment||'')===item.accompaniment&&(i.kitchenNote||'')===item.kitchenNote);
+  if(existing)existing.qty=Number(existing.qty||0)+1; else state.cart.push(item);
+  state.cart=consolidateCart(state.cart);
+  state.sent=false;state.dirty=true;save();renderCart();
+}
 function addProduct(p){
   if(p.stock<=0)return toast('Produit en rupture');
-  const defaultService=({Entrées:'Entrée',Plats:'Plat',Desserts:'Dessert',Boissons:'Boisson'}[p.cat]||'Plat');
-  const configurable=Boolean(p.askCooking||p.askSauce);
-
-  if(configurable){
-    // On crée d'abord une ligne séparée pour choisir sa cuisson/sauce.
-    // Ensuite les lignes avec exactement les mêmes options se regroupent.
-    state.cart.push({
-      ...p,
-      qty:1,
-      separatorAfter:false,
-      service:defaultService,
-      cooking:'',
-      sauce:'',
-      accompaniment:'',
-      kitchenNote:''
-    });
-  }else{
-    const start=currentManualSegmentStart();
-    const e=state.cart.slice(start).find(i=>
-      Number(i.id)===Number(p.id) &&
-      (i.service||defaultService)===defaultService &&
-      !i.cooking && !i.sauce
-    );
-    if(e)e.qty=Number(e.qty||0)+1;
-    else state.cart.push({
-      ...p,
-      qty:1,
-      separatorAfter:false,
-      service:defaultService,
-      cooking:'',
-      sauce:'',
-      accompaniment:'',
-      kitchenNote:''
-    });
+  if(productRequiresConfiguration(p)){
+    pendingProductConfig={productId:p.id,cooking:'',sauce:'',accompaniment:'',kitchenNote:''};
+    modal(`Configurer — ${p.name}`,productConfiguratorHtml(p));
+    return;
   }
-
-  state.cart=consolidateCart(state.cart);
-  state.sent=false;
-  state.dirty=true;
-  save();
-  renderCart();
+  addConfiguredProduct(p,{});
 }
 function changeQty(i,d){
   i.qty+=d;
@@ -585,6 +590,32 @@ document.addEventListener('click',e=>{
   if(e.target.classList.contains('editKitchenMessage')){const idx=Number(e.target.dataset.index);modal('Modifier message',kitchenMessageForm(state.kitchenMessages[idx],idx))}
   if(e.target.id==='saveKitchenMessageEdit'){const idx=Number(e.target.dataset.index),m=qs('#kmText').value.trim();if(m)state.kitchenMessages[idx]=m;save();closeModal();renderKitchenOptions();toast('Message modifié')}
   if(e.target.classList.contains('deleteKitchenMessage')){state.kitchenMessages.splice(Number(e.target.dataset.index),1);save();renderKitchenOptions();toast('Message supprimé')}
+  if(e.target.classList.contains('config-cooking')){
+    qsa('.config-cooking').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');if(pendingProductConfig)pendingProductConfig.cooking=e.target.dataset.value;
+  }
+  if(e.target.classList.contains('config-sauce')){
+    qsa('.config-sauce').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');if(pendingProductConfig)pendingProductConfig.sauce=e.target.dataset.value;
+  }
+  if(e.target.classList.contains('config-accompaniment')){
+    qsa('.config-accompaniment').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');if(pendingProductConfig)pendingProductConfig.accompaniment=e.target.dataset.value;
+  }
+  if(e.target.classList.contains('config-message')){
+    const wasActive=e.target.classList.contains('active');qsa('.config-message').forEach(b=>b.classList.remove('active'));
+    if(pendingProductConfig)pendingProductConfig.kitchenNote=wasActive?'':e.target.dataset.value;
+    if(!wasActive)e.target.classList.add('active');
+    const custom=qs('#configCustomMessage');if(custom)custom.value='';
+  }
+  if(e.target.id==='cancelProductConfig'){pendingProductConfig=null;closeModal()}
+  if(e.target.id==='confirmProductConfig'){
+    if(!pendingProductConfig)return;
+    const p=state.products.find(x=>Number(x.id)===Number(pendingProductConfig.productId));if(!p)return;
+    const group=getAccompanimentGroup(p.accompanimentGroupId);
+    const custom=qs('#configCustomMessage')?.value.trim();if(custom)pendingProductConfig.kitchenNote=custom;
+    if(p.askCooking&&!pendingProductConfig.cooking)return toast('Choisissez la cuisson');
+    if(p.askSauce&&!pendingProductConfig.sauce)return toast('Choisissez la sauce');
+    if(group&&!pendingProductConfig.accompaniment)return toast('Choisissez l’accompagnement');
+    addConfiguredProduct(p,pendingProductConfig);pendingProductConfig=null;closeModal();toast('Article ajouté');
+  }
   if(e.target.id==='confirmReset'){localStorage.removeItem(STORAGE);location.reload()}
 });
 qs('#modal').onclick=e=>{if(e.target.id==='modal')closeModal()};

@@ -1,3 +1,19 @@
+# Restaurant Pro v2.19 — Fenêtre automatique des options
+
+Quand un article possède une cuisson, une sauce ou une famille d’accompagnements, toucher le produit ouvre immédiatement une grande fenêtre.
+
+Exemple Entrecôte :
+1. toucher Entrecôte ;
+2. choisir cuisson ;
+3. choisir sauce ;
+4. choisir accompagnement ;
+5. éventuellement choisir un message rapide ou écrire un message libre ;
+6. toucher **Ajouter à la commande**.
+
+Le produit n’entre dans la commande qu’après validation.
+
+Les articles sans choix obligatoire (par exemple Coca-Cola) restent en pointage direct.
+
 # Restaurant Pro v2.18 — Accompagnements et messages cuisine
 
 - Création article : cuisson oui/non, sauce oui/non, famille d’accompagnements, messages cuisine oui/non.
