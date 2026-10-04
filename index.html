@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
-<title>Restaurant Pro v2.20 — Démo GitHub</title>
+<title>Restaurant Pro v2.21 — Démo GitHub</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=220">
+<link rel="stylesheet" href="style.css?v=221">
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
@@ -24,7 +24,7 @@
 <header class="topbar">
   <div>
     <div class="brand">Restaurant <span>Pro</span></div>
-    <div class="sub">v2.20 · Démo gratuite GitHub Pages</div>
+    <div class="sub">v2.21 · Démo gratuite GitHub Pages</div>
   </div>
   <div class="top-actions">
     <span id="cashBadge" class="badge closed">Caisse fermée</span>
@@ -63,9 +63,25 @@
 
   <div class="pos-layout">
     <section class="left-panel">
-      <div id="tablesPanel">
-        <div class="section-title"><h2>Plan de salle</h2><span class="muted">Vert libre · Orange occupée · Bleu réservée</span></div>
-        <div id="tables" class="tables"></div>
+      <div id="tablesPanel" class="quick-table-panel">
+        <div class="section-title"><h2>Table</h2><span class="muted">Accès rapide par numéro</span></div>
+        <div class="quick-table-selector">
+          <div class="quick-table-display">
+            <label for="quickTableNumber">N° de table</label>
+            <input id="quickTableNumber" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="Ex. 12">
+          </div>
+          <div class="table-keypad" aria-label="Pavé numérique table">
+            <button type="button" data-table-digit="1">1</button><button type="button" data-table-digit="2">2</button><button type="button" data-table-digit="3">3</button>
+            <button type="button" data-table-digit="4">4</button><button type="button" data-table-digit="5">5</button><button type="button" data-table-digit="6">6</button>
+            <button type="button" data-table-digit="7">7</button><button type="button" data-table-digit="8">8</button><button type="button" data-table-digit="9">9</button>
+            <button type="button" id="quickTableBackspace">⌫</button><button type="button" data-table-digit="0">0</button><button type="button" id="quickTableClear">C</button>
+          </div>
+          <div class="quick-table-actions">
+            <button id="openTableByNumber" class="primary">Ouvrir la table</button>
+            <button id="openFloorPlanBtn" class="floor-plan-open">🗺️ Plan de salle</button>
+          </div>
+          <div class="floor-legend compact"><span>🟢 Libre</span><span>🟠 Occupée</span><span>🔵 Réservée</span></div>
+        </div>
       </div>
       <div class="catalog">
         <div id="categories" class="categories"></div>
@@ -196,6 +212,20 @@
     <label>Nom de l’établissement<input id="generalEstablishmentName"></label>
     <button id="saveGeneralSettingsBtn" class="primary">Enregistrer</button>
   </div>
+
+  <div class="settings-card room-settings-card">
+    <div class="section-title"><div><h2>🗺️ Plan de salle</h2><div id="roomCountLabel" class="muted"></div></div><button id="addRoomBtn" class="primary">+ Ajouter une salle</button></div>
+    <p class="muted">Créez vos salles, ajoutez les tables et déplacez-les directement sur le plan avec la souris ou le doigt.</p>
+    <div class="room-settings-toolbar">
+      <select id="settingsRoomSelect"></select>
+      <button id="renameRoomBtn" class="secondary">Renommer la salle</button>
+      <button id="deleteRoomBtn" class="dangerbtn">Supprimer la salle</button>
+      <button id="addTableBtn" class="primary">+ Ajouter une table</button>
+    </div>
+    <div id="settingsFloorPlan" class="floor-plan-stage settings-floor-plan"></div>
+    <h3>Tables de cette salle</h3>
+    <div id="settingsTablesList" class="room-tables-list"></div>
+  </div>
 </section>
 </main>
 </div>
@@ -208,6 +238,6 @@
 </div>
 <button id="floatingReservationsBtn" class="floating-reservations">📅 Réservations</button>
 <div id="toast"></div>
-<script src="app.js?v=220"></script>
+<script src="app.js?v=221"></script>
 </body>
 </html>

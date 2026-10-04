@@ -1,3 +1,14 @@
+# Restaurant Pro v2.21 — Numéro de table + plan multi-salles
+
+- Sélection rapide d’une table par numéro avec pavé numérique.
+- Bouton **🗺️ Plan de salle** : choix de la salle puis de la table.
+- Plusieurs salles configurables : salle principale, terrasse, étage, salon, etc.
+- Création, renommage et suppression des salles dans **Paramètres**.
+- Création, modification et suppression des tables avec numéro unique et nombre de places.
+- Déplacement visuel des tables sur le plan par glisser-déposer (souris ou tactile).
+- États visuels : **vert = libre**, **orange = occupée**, **bleu = réservée**.
+- Une table occupée recharge sa commande ouverte existante.
+
 # Restaurant Pro v2.20 — Ticket regroupé par produit
 
 Le ticket regroupe maintenant le nom du produit une seule fois, puis affiche les variantes en dessous.

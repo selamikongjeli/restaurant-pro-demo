@@ -6,10 +6,11 @@ let pendingProductConfig=null;
 
 const defaults={
   user:null,cashOpen:false,cashOpening:0,currentMode:'table',tableId:null,category:'Plats',sent:false,dirty:false,payment:'card',
+  rooms:[{id:1,name:'Salle principale'}],nextRoomId:2,nextTableId:11,posRoomId:1,settingsRoomId:1,
   tables:[
-    {id:1,name:'Table 1',seats:2},{id:2,name:'Table 2',seats:4},{id:3,name:'Table 3',seats:2},{id:4,name:'Table 4',seats:4},
-    {id:5,name:'Table 5',seats:2},{id:6,name:'Table 6',seats:4},{id:7,name:'Table 7',seats:4},{id:8,name:'Table 8',seats:2},
-    {id:9,name:'Table 9',seats:2},{id:10,name:'Table 10',seats:6}
+    {id:1,number:1,name:'Table 1',seats:2,roomId:1,x:8,y:10},{id:2,number:2,name:'Table 2',seats:4,roomId:1,x:30,y:10},{id:3,number:3,name:'Table 3',seats:2,roomId:1,x:52,y:10},{id:4,number:4,name:'Table 4',seats:4,roomId:1,x:74,y:10},
+    {id:5,number:5,name:'Table 5',seats:2,roomId:1,x:8,y:38},{id:6,number:6,name:'Table 6',seats:4,roomId:1,x:30,y:38},{id:7,number:7,name:'Table 7',seats:4,roomId:1,x:52,y:38},{id:8,number:8,name:'Table 8',seats:2,roomId:1,x:74,y:38},
+    {id:9,number:9,name:'Table 9',seats:2,roomId:1,x:18,y:68},{id:10,number:10,name:'Table 10',seats:6,roomId:1,x:58,y:68}
   ],
   products:[
     {id:1,cat:'Entrées',name:'Croquettes parmesan',price:12.9,vat:12,station:'Cuisine',stock:30,low:5},
@@ -62,6 +63,28 @@ function load(){
     state.accompanimentGroups=Array.isArray(state.accompanimentGroups)&&state.accompanimentGroups.length?state.accompanimentGroups:structuredClone(defaults.accompanimentGroups);
     state.kitchenMessages=Array.isArray(state.kitchenMessages)&&state.kitchenMessages.length?state.kitchenMessages:[...defaults.kitchenMessages];
     state.nextAccompanimentGroupId=Number(state.nextAccompanimentGroupId||2);
+
+    // v2.21 — migration plan de salle / multi-salles
+    state.rooms=Array.isArray(state.rooms)&&state.rooms.length?state.rooms:structuredClone(defaults.rooms);
+    const firstRoomId=Number(state.rooms[0]?.id||1);
+    state.tables=(Array.isArray(state.tables)?state.tables:[]).map((t,index)=>{
+      const guessedNumber=Number(t.number||String(t.name||'').match(/\d+/)?.[0]||t.id||index+1);
+      const col=index%4,row=Math.floor(index/4);
+      return {
+        ...t,
+        id:Number(t.id||index+1),
+        number:guessedNumber,
+        name:t.name||`Table ${guessedNumber}`,
+        seats:Number(t.seats||2),
+        roomId:Number(t.roomId||firstRoomId),
+        x:Number.isFinite(Number(t.x))?Number(t.x):8+(col*22),
+        y:Number.isFinite(Number(t.y))?Number(t.y):10+(row*28)
+      };
+    });
+    state.nextRoomId=Math.max(Number(state.nextRoomId||0)-1,...state.rooms.map(r=>Number(r.id)||0),0)+1;
+    state.nextTableId=Math.max(Number(state.nextTableId||0)-1,...state.tables.map(t=>Number(t.id)||0),0)+1;
+    if(!state.rooms.some(r=>Number(r.id)===Number(state.posRoomId)))state.posRoomId=firstRoomId;
+    if(!state.rooms.some(r=>Number(r.id)===Number(state.settingsRoomId)))state.settingsRoomId=firstRoomId;
   }catch{}
 }
 function toast(msg){const t=qs('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
@@ -124,31 +147,69 @@ function tableReservationToday(tableId){
   const today=localDateISO();
   return state.reservations.filter(r=>r.date===today&&Number(r.tableId)===Number(tableId)&&r.status==='booked').sort((a,b)=>a.time.localeCompare(b.time))[0];
 }
+function roomById(id){return state.rooms.find(r=>Number(r.id)===Number(id))||state.rooms[0]||null}
+function tableByNumber(number){return state.tables.find(t=>Number(t.number)===Number(number))||null}
+function tableRoomName(t){return roomById(t?.roomId)?.name||'Salle'}
+function tableStatusClass(t){const order=state.openOrders[t.id],res=tableReservationToday(t.id);return (order?' occupied':'')+(res?' reserved':'')+(Number(state.tableId)===Number(t.id)?' active':'')}
+function tableButtonInner(t){
+  const order=state.openOrders[t.id],res=tableReservationToday(t.id);
+  return `<b>${esc(t.name||`Table ${t.number}`)}</b><br><small>N° ${esc(t.number)} · ${t.seats} places${order?' · OUVERTE':''}</small>${res?`<span class="reservation-label">R ${esc(res.time)} · ${esc(res.customerName)}</span>`:''}`;
+}
 function renderTables(){
-  const w=qs('#tables');w.innerHTML='';
+  // Compatibilité : si un ancien emplacement #tables existe encore, on l'alimente.
+  const w=qs('#tables');if(!w)return;
+  w.innerHTML='';
   state.tables.forEach(t=>{
-    const order=state.openOrders[t.id],res=tableReservationToday(t.id);
     const b=document.createElement('button');
-    b.className='table-btn'+(order?' occupied':'')+(res?' reserved':'')+(Number(state.tableId)===Number(t.id)?' active':'');
-    b.innerHTML=`<b>${esc(t.name)}</b><br><small>${t.seats} places${order?' · OUVERTE':''}</small>${res?`<span class="reservation-label">R ${esc(res.time)} · ${esc(res.customerName)}</span>`:''}`;
+    b.className='table-btn'+tableStatusClass(t);
+    b.innerHTML=tableButtonInner(t);
     b.onclick=()=>selectTable(t);w.appendChild(b)
   })
 }
 function selectTable(t){
-  state.currentMode='table';state.tableId=t.id;
+  if(!t)return toast('Table introuvable');
+  state.currentMode='table';state.tableId=t.id;state.posRoomId=t.roomId;
   const open=state.openOrders[t.id];
   state.cart=open?consolidateCart(structuredClone(open.items)):[];
   state.sent=!!open;state.dirty=false;
   qsa('.mode').forEach(b=>b.classList.toggle('active',b.dataset.mode==='table'));
+  const quick=qs('#quickTableNumber');if(quick)quick.value=String(t.number);
   save();renderTables();renderContext();renderCart()
+}
+function openTableByNumber(){
+  const input=qs('#quickTableNumber');
+  const number=Number(input?.value||0);
+  if(!number)return toast('Indiquez le numéro de table');
+  const t=tableByNumber(number);
+  if(!t)return toast(`Table ${number} introuvable`);
+  selectTable(t);
+}
+function roomTabsHtml(selectedRoomId,settingsMode=false){
+  return `<div class="room-tabs">${state.rooms.map(r=>`<button type="button" class="room-tab ${Number(r.id)===Number(selectedRoomId)?'active':''}" data-${settingsMode?'settings-':'plan-'}room-id="${r.id}">${esc(r.name)}</button>`).join('')}</div>`;
+}
+function floorPlanTableHtml(t,settingsMode=false){
+  const cls=settingsMode?'settings-table-node':'plan-table-node';
+  return `<button type="button" class="${cls}${settingsMode?'':' '+tableStatusClass(t)}" data-${settingsMode?'settings-':'select-'}table-id="${t.id}" style="left:${Math.max(0,Math.min(88,Number(t.x)||0))}%;top:${Math.max(0,Math.min(82,Number(t.y)||0))}%"><b>${esc(t.number)}</b><span>${esc(t.name)}</span><small>${t.seats} pl.</small></button>`;
+}
+function floorPlanModalHtml(roomId){
+  const room=roomById(roomId);if(!room)return '<div class="empty">Aucune salle</div>';
+  const tables=state.tables.filter(t=>Number(t.roomId)===Number(room.id));
+  return `<div class="floor-plan-modal"><div class="muted floor-plan-help">Choisissez une salle puis touchez une table.</div>${roomTabsHtml(room.id)}<div class="floor-plan-stage">${tables.map(t=>floorPlanTableHtml(t)).join('')||'<div class="floor-plan-empty">Aucune table dans cette salle.</div>'}</div><div class="floor-legend"><span>🟢 Libre</span><span>🟠 Occupée</span><span>🔵 Réservée</span></div></div>`;
+}
+function openFloorPlan(roomId=state.posRoomId){
+  state.posRoomId=roomById(roomId)?.id||state.rooms[0]?.id||null;save();
+  modal('🗺️ Plan de salle',floorPlanModalHtml(state.posRoomId));
 }
 qsa('.mode').forEach(b=>b.onclick=()=>{
   state.currentMode=b.dataset.mode;state.tableId=null;state.cart=[];state.sent=false;state.dirty=false;
+  const quick=qs('#quickTableNumber');if(quick)quick.value='';
   qsa('.mode').forEach(x=>x.classList.toggle('active',x===b));renderContext();renderCart();renderTables();save()
 });
+const quickTableInput=qs('#quickTableNumber');
+if(quickTableInput)quickTableInput.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();openTableByNumber()}};
 function renderContext(){
   let x=state.currentMode==='takeaway'?'Commande à emporter':state.currentMode==='delivery'?'Commande livraison':'Choisissez une table';
-  if(state.currentMode==='table'&&state.tableId)x=state.tables.find(t=>t.id===state.tableId)?.name||x;
+  if(state.currentMode==='table'&&state.tableId){const t=state.tables.find(t=>t.id===state.tableId);if(t)x=`${tableRoomName(t)} · ${t.name}`;}
   qs('#orderContext').textContent=x
 }
 function renderCategories(){
@@ -556,11 +617,97 @@ function renderInvoices(){const total=state.invoices.reduce((s,i)=>s+invoiceTota
 function invoicePreview(i){const t=invoiceTotals(i);return `<div class="invoice-preview"><div style="display:flex;justify-content:space-between"><div><h2>${esc(state.settings.establishmentName)}</h2><div class="muted">Facture de démonstration</div></div><div><h3>FAC-${String(i.id).padStart(4,'0')}</h3><div>${esc(i.date)}</div></div></div><hr><b>Client</b><br>${esc(i.customerName)}<br>${esc(i.customerAddress||'')}${i.customerVat?`<br>TVA : ${esc(i.customerVat)}`:''}<table class="invoice-preview-table"><thead><tr><th>Description</th><th>Qté</th><th>PU HT</th><th>TVA</th><th>TTC</th></tr></thead><tbody>${i.lines.map(l=>`<tr><td>${esc(l.description)}</td><td>${l.qty}</td><td>${money(l.unitPrice)}</td><td>${l.vat}%</td><td>${money(l.qty*l.unitPrice*(1+l.vat/100))}</td></tr>`).join('')}</tbody></table><div class="invoice-preview-total"><div>HT : <b>${money(t.ht)}</b></div><div>TVA : <b>${money(t.tva)}</b></div><div style="font-size:20px">TTC : <b>${money(t.ttc)}</b></div></div><div class="muted" style="margin-top:16px">Document de démonstration — non Peppol / non SCE</div></div>`}
 qs('#newExpenseBtn').onclick=()=>modal('Nouvelle dépense',expenseForm());qs('#newSupplierBtn').onclick=()=>modal('Nouveau fournisseur',supplierForm());qs('#exportAccountingCsvBtn').onclick=()=>downloadText(`restaurant-pro-comptabilite-${localDateISO()}.csv`,accountingCsv(),'text/csv');qs('#accountingPeriod').onchange=renderAccounting;qs('#newInvoiceBtn').onclick=()=>modal('Nouvelle facture',invoiceForm());
 
-function renderSettings(){qs('#generalEstablishmentName').value=state.settings.establishmentName}
+function tableSettingsForm(t=null){
+  const x=t||{};
+  const number=x.number??'';
+  return `<div class="form-grid">
+    <label>Numéro de table<input id="tableSettingNumber" type="number" min="1" step="1" value="${esc(number)}" placeholder="Ex. 12"></label>
+    <label>Nombre de places<input id="tableSettingSeats" type="number" min="1" step="1" value="${Number(x.seats||2)}"></label>
+    <label>Salle<select id="tableSettingRoom">${state.rooms.map(r=>`<option value="${r.id}" ${Number(x.roomId||state.settingsRoomId)===Number(r.id)?'selected':''}>${esc(r.name)}</option>`).join('')}</select></label>
+    <label class="span3">Nom / libellé<input id="tableSettingName" value="${esc(x.name||'')}" placeholder="Laisser vide pour Table + numéro"></label>
+    <button id="${t?'saveTableEdit':'saveTableCreate'}" ${t?`data-id="${t.id}"`:''} class="primary span3">${t?'Enregistrer la table':'Créer la table'}</button>
+  </div>`;
+}
+function renderRoomSettings(){
+  const select=qs('#settingsRoomSelect'),stage=qs('#settingsFloorPlan'),list=qs('#settingsTablesList');
+  if(!select||!stage||!list)return;
+  if(!roomById(state.settingsRoomId))state.settingsRoomId=state.rooms[0]?.id||null;
+  select.innerHTML=state.rooms.map(r=>`<option value="${r.id}" ${Number(r.id)===Number(state.settingsRoomId)?'selected':''}>${esc(r.name)}</option>`).join('');
+  const room=roomById(state.settingsRoomId);
+  const tables=room?state.tables.filter(t=>Number(t.roomId)===Number(room.id)):[];
+  stage.innerHTML=tables.map(t=>floorPlanTableHtml(t,true)).join('')||'<div class="floor-plan-empty">Aucune table. Cliquez sur « + Ajouter une table ».</div>';
+  list.innerHTML=tables.map(t=>`<div class="room-table-row"><div><b>Table ${esc(t.number)}</b> · ${esc(t.name)}<div class="muted">${t.seats} places · ${esc(room?.name||'')}</div></div><div><button class="secondary editTableSetting" data-id="${t.id}">Modifier</button> <button class="dangerbtn deleteTableSetting" data-id="${t.id}">Supprimer</button></div></div>`).join('')||'<div class="empty">Aucune table dans cette salle</div>';
+  qs('#roomCountLabel').textContent=`${state.rooms.length} salle(s) · ${state.tables.length} table(s)`;
+  bindSettingsTableDrag();
+}
+function bindSettingsTableDrag(){
+  const stage=qs('#settingsFloorPlan');if(!stage)return;
+  stage.querySelectorAll('.settings-table-node').forEach(node=>{
+    node.onpointerdown=e=>{
+      if(e.button!==undefined&&e.button!==0)return;
+      e.preventDefault();
+      const id=Number(node.dataset.settingsTableId),t=state.tables.find(v=>Number(v.id)===id);if(!t)return;
+      const rect=stage.getBoundingClientRect();node.setPointerCapture?.(e.pointerId);node.classList.add('dragging');
+      const move=ev=>{
+        const x=((ev.clientX-rect.left)/rect.width)*100-6;
+        const y=((ev.clientY-rect.top)/rect.height)*100-7;
+        t.x=Math.max(0,Math.min(88,x));t.y=Math.max(0,Math.min(82,y));
+        node.style.left=t.x+'%';node.style.top=t.y+'%';
+      };
+      const up=()=>{node.classList.remove('dragging');document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);save()};
+      document.addEventListener('pointermove',move);document.addEventListener('pointerup',up,{once:true});
+    };
+  });
+}
+function renderSettings(){
+  qs('#generalEstablishmentName').value=state.settings.establishmentName;
+  renderRoomSettings();
+}
 qs('#saveGeneralSettingsBtn').onclick=()=>{state.settings.establishmentName=qs('#generalEstablishmentName').value.trim()||'Restaurant Pro';save();toast('Paramètres enregistrés')};
+qs('#settingsRoomSelect').onchange=e=>{state.settingsRoomId=Number(e.target.value);save();renderRoomSettings()};
+qs('#addRoomBtn').onclick=()=>modal('Ajouter une salle',`<div class="form-grid"><label class="span3">Nom de la salle<input id="newRoomName" placeholder="Ex. Terrasse, Étage, Salon..."></label><button id="saveRoomCreate" class="primary span3">Créer la salle</button></div>`);
+qs('#renameRoomBtn').onclick=()=>{const r=roomById(state.settingsRoomId);if(r)modal('Renommer la salle',`<div class="form-grid"><label class="span3">Nom<input id="renameRoomName" value="${esc(r.name)}"></label><button id="saveRoomRename" data-id="${r.id}" class="primary span3">Enregistrer</button></div>`)};
+qs('#deleteRoomBtn').onclick=()=>{const r=roomById(state.settingsRoomId);if(!r)return;if(state.rooms.length<=1)return toast('Il faut conserver au moins une salle');if(state.tables.some(t=>Number(t.roomId)===Number(r.id)))return toast('Déplacez ou supprimez d’abord les tables de cette salle');if(confirm(`Supprimer la salle « ${r.name} » ?`)){state.rooms=state.rooms.filter(x=>Number(x.id)!==Number(r.id));state.settingsRoomId=state.rooms[0].id;state.posRoomId=state.rooms[0].id;save();renderRoomSettings();toast('Salle supprimée')}};
+qs('#addTableBtn').onclick=()=>modal('Ajouter une table',tableSettingsForm());
 
 document.addEventListener('click',e=>{
   if(e.target.id==='modalClose')closeModal();
+
+  // ===== v2.21 : sélection rapide + plan de salle =====
+  if(e.target.matches('[data-table-digit]')){const input=qs('#quickTableNumber');if(input&&input.value.length<4)input.value+=e.target.dataset.tableDigit}
+  if(e.target.id==='quickTableBackspace'){const input=qs('#quickTableNumber');if(input)input.value=input.value.slice(0,-1)}
+  if(e.target.id==='quickTableClear'){const input=qs('#quickTableNumber');if(input)input.value=''}
+  if(e.target.id==='openTableByNumber')openTableByNumber();
+  if(e.target.id==='openFloorPlanBtn')openFloorPlan();
+  if(e.target.matches('[data-plan-room-id]'))openFloorPlan(Number(e.target.dataset.planRoomId));
+  const planTable=e.target.closest?.('[data-select-table-id]');
+  if(planTable){const t=state.tables.find(v=>Number(v.id)===Number(planTable.dataset.selectTableId));if(t){closeModal();selectTable(t)}}
+
+  // ===== v2.21 : gestion salles / tables =====
+  if(e.target.id==='saveRoomCreate'){
+    const name=qs('#newRoomName')?.value.trim();if(!name)return toast('Nom de salle requis');
+    const r={id:state.nextRoomId++,name};state.rooms.push(r);state.settingsRoomId=r.id;state.posRoomId=r.id;save();closeModal();renderRoomSettings();toast('Salle créée');
+  }
+  if(e.target.id==='saveRoomRename'){
+    const r=roomById(Number(e.target.dataset.id)),name=qs('#renameRoomName')?.value.trim();if(!r||!name)return toast('Nom requis');r.name=name;save();closeModal();renderRoomSettings();renderContext();toast('Salle renommée');
+  }
+  if(e.target.id==='saveTableCreate'||e.target.id==='saveTableEdit'){
+    const number=Number(qs('#tableSettingNumber')?.value),seats=Number(qs('#tableSettingSeats')?.value),roomId=Number(qs('#tableSettingRoom')?.value),editing=e.target.id==='saveTableEdit',id=Number(e.target.dataset.id||0);
+    if(!Number.isInteger(number)||number<1)return toast('Numéro de table invalide');
+    if(!Number.isInteger(seats)||seats<1)return toast('Nombre de places invalide');
+    if(state.tables.some(t=>Number(t.number)===number&&(!editing||Number(t.id)!==id)))return toast(`Le numéro ${number} existe déjà`);
+    const name=qs('#tableSettingName')?.value.trim()||`Table ${number}`;
+    if(editing){const t=state.tables.find(v=>Number(v.id)===id);if(!t)return;t.number=number;t.seats=seats;t.roomId=roomId;t.name=name;}
+    else{const sameRoomCount=state.tables.filter(t=>Number(t.roomId)===roomId).length;state.tables.push({id:state.nextTableId++,number,name,seats,roomId,x:8+((sameRoomCount%4)*22),y:10+(Math.floor(sameRoomCount/4)*28)});}
+    state.settingsRoomId=roomId;save();closeModal();renderRoomSettings();renderTables();toast(editing?'Table modifiée':'Table créée');
+  }
+  if(e.target.classList.contains('editTableSetting')){const t=state.tables.find(v=>Number(v.id)===Number(e.target.dataset.id));if(t)modal('Modifier la table',tableSettingsForm(t))}
+  if(e.target.classList.contains('deleteTableSetting')){
+    const id=Number(e.target.dataset.id),t=state.tables.find(v=>Number(v.id)===id);if(!t)return;
+    if(state.openOrders[id])return toast('Impossible : cette table a une commande ouverte');
+    if(state.reservations.some(r=>Number(r.tableId)===id&&!['cancelled','finished','no_show'].includes(r.status)))return toast('Impossible : réservation active sur cette table');
+    if(confirm(`Supprimer ${t.name} ?`)){state.tables=state.tables.filter(v=>Number(v.id)!==id);if(Number(state.tableId)===id){state.tableId=null;state.cart=[];state.sent=false;state.dirty=false}save();renderRoomSettings();renderTables();renderContext();renderCart();toast('Table supprimée')}
+  }
   if(e.target.id==='confirmOpenCash'){state.cashOpen=true;state.cashOpening=Number(qs('#cashOpenAmount').value||0);save();renderCash();closeModal();toast('Caisse ouverte')}
   if(e.target.id==='confirmCloseCash'){state.cashOpen=false;save();renderCash();closeModal();toast('Caisse fermée')}
   if(e.target.classList.contains('newAtSlot'))modal('Nouvelle réservation',reservationForm(null,e.target.dataset.time));
