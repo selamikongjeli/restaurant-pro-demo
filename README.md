@@ -1,4 +1,13 @@
-# Restaurant Pro v2.21 — Numéro de table + plan multi-salles
+# Restaurant Pro v2.22 — Plan de salle personnalisable
+
+## Nouveauté v2.22 — dimensions, forme et rotation des tables
+
+- Largeur réglable de 56 à 220 px.
+- Hauteur réglable de 42 à 160 px.
+- Rotation 0°, 90°, 180° ou 270°.
+- Bouton rapide **↻ Tourner 90°** dans la liste des tables.
+- Forme **rectangle**, **coins arrondis** ou **ronde / ovale**.
+- Le glisser-déposer tient compte de la taille réelle de la table pour mieux rester dans le plan.
 
 - Sélection rapide d’une table par numéro avec pavé numérique.
 - Bouton **🗺️ Plan de salle** : choix de la salle puis de la table.

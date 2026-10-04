@@ -64,7 +64,7 @@ function load(){
     state.kitchenMessages=Array.isArray(state.kitchenMessages)&&state.kitchenMessages.length?state.kitchenMessages:[...defaults.kitchenMessages];
     state.nextAccompanimentGroupId=Number(state.nextAccompanimentGroupId||2);
 
-    // v2.21 — migration plan de salle / multi-salles
+    // v2.22 — migration plan de salle / multi-salles + dimensions / rotation
     state.rooms=Array.isArray(state.rooms)&&state.rooms.length?state.rooms:structuredClone(defaults.rooms);
     const firstRoomId=Number(state.rooms[0]?.id||1);
     state.tables=(Array.isArray(state.tables)?state.tables:[]).map((t,index)=>{
@@ -78,7 +78,11 @@ function load(){
         seats:Number(t.seats||2),
         roomId:Number(t.roomId||firstRoomId),
         x:Number.isFinite(Number(t.x))?Number(t.x):8+(col*22),
-        y:Number.isFinite(Number(t.y))?Number(t.y):10+(row*28)
+        y:Number.isFinite(Number(t.y))?Number(t.y):10+(row*28),
+        width:Math.max(56,Math.min(220,Number(t.width||100))),
+        height:Math.max(42,Math.min(160,Number(t.height||72))),
+        rotation:[0,90,180,270].includes(Number(t.rotation))?Number(t.rotation):0,
+        shape:['rectangle','rounded','round'].includes(t.shape)?t.shape:'rounded'
       };
     });
     state.nextRoomId=Math.max(Number(state.nextRoomId||0)-1,...state.rooms.map(r=>Number(r.id)||0),0)+1;
@@ -189,7 +193,14 @@ function roomTabsHtml(selectedRoomId,settingsMode=false){
 }
 function floorPlanTableHtml(t,settingsMode=false){
   const cls=settingsMode?'settings-table-node':'plan-table-node';
-  return `<button type="button" class="${cls}${settingsMode?'':' '+tableStatusClass(t)}" data-${settingsMode?'settings-':'select-'}table-id="${t.id}" style="left:${Math.max(0,Math.min(88,Number(t.x)||0))}%;top:${Math.max(0,Math.min(82,Number(t.y)||0))}%"><b>${esc(t.number)}</b><span>${esc(t.name)}</span><small>${t.seats} pl.</small></button>`;
+  const rotation=[0,90,180,270].includes(Number(t.rotation))?Number(t.rotation):0;
+  const baseW=Math.max(56,Math.min(220,Number(t.width||100)));
+  const baseH=Math.max(42,Math.min(160,Number(t.height||72)));
+  const vertical=rotation===90||rotation===270;
+  const w=vertical?baseH:baseW,h=vertical?baseW:baseH;
+  const shape=['rectangle','rounded','round'].includes(t.shape)?t.shape:'rounded';
+  const x=Math.max(0,Math.min(96,Number(t.x)||0)),y=Math.max(0,Math.min(92,Number(t.y)||0));
+  return `<button type="button" class="${cls} table-shape-${shape}${settingsMode?'':' '+tableStatusClass(t)}" data-${settingsMode?'settings-':'select-'}table-id="${t.id}" data-rotation="${rotation}" style="left:${x}%;top:${y}%;width:${w}px;height:${h}px"><b>${esc(t.number)}</b><span>${esc(t.name)}</span><small>${t.seats} pl.</small></button>`;
 }
 function floorPlanModalHtml(roomId){
   const room=roomById(roomId);if(!room)return '<div class="empty">Aucune salle</div>';
@@ -620,11 +631,18 @@ qs('#newExpenseBtn').onclick=()=>modal('Nouvelle dépense',expenseForm());qs('#n
 function tableSettingsForm(t=null){
   const x=t||{};
   const number=x.number??'';
+  const rotation=[0,90,180,270].includes(Number(x.rotation))?Number(x.rotation):0;
+  const shape=['rectangle','rounded','round'].includes(x.shape)?x.shape:'rounded';
   return `<div class="form-grid">
     <label>Numéro de table<input id="tableSettingNumber" type="number" min="1" step="1" value="${esc(number)}" placeholder="Ex. 12"></label>
     <label>Nombre de places<input id="tableSettingSeats" type="number" min="1" step="1" value="${Number(x.seats||2)}"></label>
     <label>Salle<select id="tableSettingRoom">${state.rooms.map(r=>`<option value="${r.id}" ${Number(x.roomId||state.settingsRoomId)===Number(r.id)?'selected':''}>${esc(r.name)}</option>`).join('')}</select></label>
-    <label class="span3">Nom / libellé<input id="tableSettingName" value="${esc(x.name||'')}" placeholder="Laisser vide pour Table + numéro"></label>
+    <label>Largeur (px)<input id="tableSettingWidth" type="number" min="56" max="220" step="4" value="${Math.max(56,Math.min(220,Number(x.width||100)))}"></label>
+    <label>Hauteur (px)<input id="tableSettingHeight" type="number" min="42" max="160" step="4" value="${Math.max(42,Math.min(160,Number(x.height||72)))}"></label>
+    <label>Orientation<select id="tableSettingRotation">${[0,90,180,270].map(v=>`<option value="${v}" ${rotation===v?'selected':''}>${v}°</option>`).join('')}</select></label>
+    <label>Forme<select id="tableSettingShape"><option value="rectangle" ${shape==='rectangle'?'selected':''}>Rectangle</option><option value="rounded" ${shape==='rounded'?'selected':''}>Coins arrondis</option><option value="round" ${shape==='round'?'selected':''}>Ronde / ovale</option></select></label>
+    <label class="span2">Nom / libellé<input id="tableSettingName" value="${esc(x.name||'')}" placeholder="Laisser vide pour Table + numéro"></label>
+    <div class="span3 muted">Astuce : utilisez ↻ Tourner dans la liste pour pivoter rapidement de 90°.</div>
     <button id="${t?'saveTableEdit':'saveTableCreate'}" ${t?`data-id="${t.id}"`:''} class="primary span3">${t?'Enregistrer la table':'Créer la table'}</button>
   </div>`;
 }
@@ -636,7 +654,7 @@ function renderRoomSettings(){
   const room=roomById(state.settingsRoomId);
   const tables=room?state.tables.filter(t=>Number(t.roomId)===Number(room.id)):[];
   stage.innerHTML=tables.map(t=>floorPlanTableHtml(t,true)).join('')||'<div class="floor-plan-empty">Aucune table. Cliquez sur « + Ajouter une table ».</div>';
-  list.innerHTML=tables.map(t=>`<div class="room-table-row"><div><b>Table ${esc(t.number)}</b> · ${esc(t.name)}<div class="muted">${t.seats} places · ${esc(room?.name||'')}</div></div><div><button class="secondary editTableSetting" data-id="${t.id}">Modifier</button> <button class="dangerbtn deleteTableSetting" data-id="${t.id}">Supprimer</button></div></div>`).join('')||'<div class="empty">Aucune table dans cette salle</div>';
+  list.innerHTML=tables.map(t=>`<div class="room-table-row"><div><b>Table ${esc(t.number)}</b> · ${esc(t.name)}<div class="muted">${t.seats} places · ${esc(room?.name||'')} · ${Math.round(Number(t.width||100))}×${Math.round(Number(t.height||72))} px · ${Number(t.rotation||0)}°</div></div><div><button class="secondary rotateTableSetting" data-id="${t.id}">↻ Tourner 90°</button> <button class="secondary editTableSetting" data-id="${t.id}">Modifier</button> <button class="dangerbtn deleteTableSetting" data-id="${t.id}">Supprimer</button></div></div>`).join('')||'<div class="empty">Aucune table dans cette salle</div>';
   qs('#roomCountLabel').textContent=`${state.rooms.length} salle(s) · ${state.tables.length} table(s)`;
   bindSettingsTableDrag();
 }
@@ -647,11 +665,15 @@ function bindSettingsTableDrag(){
       if(e.button!==undefined&&e.button!==0)return;
       e.preventDefault();
       const id=Number(node.dataset.settingsTableId),t=state.tables.find(v=>Number(v.id)===id);if(!t)return;
-      const rect=stage.getBoundingClientRect();node.setPointerCapture?.(e.pointerId);node.classList.add('dragging');
+      const rect=stage.getBoundingClientRect(),nodeRect=node.getBoundingClientRect();
+      const offsetX=e.clientX-nodeRect.left,offsetY=e.clientY-nodeRect.top;
+      node.setPointerCapture?.(e.pointerId);node.classList.add('dragging');
       const move=ev=>{
-        const x=((ev.clientX-rect.left)/rect.width)*100-6;
-        const y=((ev.clientY-rect.top)/rect.height)*100-7;
-        t.x=Math.max(0,Math.min(88,x));t.y=Math.max(0,Math.min(82,y));
+        const widthPct=(node.offsetWidth/rect.width)*100,heightPct=(node.offsetHeight/rect.height)*100;
+        const x=((ev.clientX-rect.left-offsetX)/rect.width)*100;
+        const y=((ev.clientY-rect.top-offsetY)/rect.height)*100;
+        t.x=Math.max(0,Math.min(Math.max(0,100-widthPct),x));
+        t.y=Math.max(0,Math.min(Math.max(0,100-heightPct),y));
         node.style.left=t.x+'%';node.style.top=t.y+'%';
       };
       const up=()=>{node.classList.remove('dragging');document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);save()};
@@ -673,7 +695,7 @@ qs('#addTableBtn').onclick=()=>modal('Ajouter une table',tableSettingsForm());
 document.addEventListener('click',e=>{
   if(e.target.id==='modalClose')closeModal();
 
-  // ===== v2.21 : sélection rapide + plan de salle =====
+  // ===== v2.22 : sélection rapide + plan de salle =====
   if(e.target.matches('[data-table-digit]')){const input=qs('#quickTableNumber');if(input&&input.value.length<4)input.value+=e.target.dataset.tableDigit}
   if(e.target.id==='quickTableBackspace'){const input=qs('#quickTableNumber');if(input)input.value=input.value.slice(0,-1)}
   if(e.target.id==='quickTableClear'){const input=qs('#quickTableNumber');if(input)input.value=''}
@@ -683,7 +705,7 @@ document.addEventListener('click',e=>{
   const planTable=e.target.closest?.('[data-select-table-id]');
   if(planTable){const t=state.tables.find(v=>Number(v.id)===Number(planTable.dataset.selectTableId));if(t){closeModal();selectTable(t)}}
 
-  // ===== v2.21 : gestion salles / tables =====
+  // ===== v2.22 : gestion salles / tables / dimensions / rotation =====
   if(e.target.id==='saveRoomCreate'){
     const name=qs('#newRoomName')?.value.trim();if(!name)return toast('Nom de salle requis');
     const r={id:state.nextRoomId++,name};state.rooms.push(r);state.settingsRoomId=r.id;state.posRoomId=r.id;save();closeModal();renderRoomSettings();toast('Salle créée');
@@ -693,14 +715,21 @@ document.addEventListener('click',e=>{
   }
   if(e.target.id==='saveTableCreate'||e.target.id==='saveTableEdit'){
     const number=Number(qs('#tableSettingNumber')?.value),seats=Number(qs('#tableSettingSeats')?.value),roomId=Number(qs('#tableSettingRoom')?.value),editing=e.target.id==='saveTableEdit',id=Number(e.target.dataset.id||0);
+    const width=Math.max(56,Math.min(220,Number(qs('#tableSettingWidth')?.value||100)));
+    const height=Math.max(42,Math.min(160,Number(qs('#tableSettingHeight')?.value||72)));
+    const rotation=Number(qs('#tableSettingRotation')?.value||0);
+    const shape=qs('#tableSettingShape')?.value||'rounded';
     if(!Number.isInteger(number)||number<1)return toast('Numéro de table invalide');
     if(!Number.isInteger(seats)||seats<1)return toast('Nombre de places invalide');
+    if(![0,90,180,270].includes(rotation))return toast('Orientation invalide');
+    if(!['rectangle','rounded','round'].includes(shape))return toast('Forme invalide');
     if(state.tables.some(t=>Number(t.number)===number&&(!editing||Number(t.id)!==id)))return toast(`Le numéro ${number} existe déjà`);
     const name=qs('#tableSettingName')?.value.trim()||`Table ${number}`;
-    if(editing){const t=state.tables.find(v=>Number(v.id)===id);if(!t)return;t.number=number;t.seats=seats;t.roomId=roomId;t.name=name;}
-    else{const sameRoomCount=state.tables.filter(t=>Number(t.roomId)===roomId).length;state.tables.push({id:state.nextTableId++,number,name,seats,roomId,x:8+((sameRoomCount%4)*22),y:10+(Math.floor(sameRoomCount/4)*28)});}
+    if(editing){const t=state.tables.find(v=>Number(v.id)===id);if(!t)return;t.number=number;t.seats=seats;t.roomId=roomId;t.name=name;t.width=width;t.height=height;t.rotation=rotation;t.shape=shape;}
+    else{const sameRoomCount=state.tables.filter(t=>Number(t.roomId)===roomId).length;state.tables.push({id:state.nextTableId++,number,name,seats,roomId,x:8+((sameRoomCount%4)*22),y:10+(Math.floor(sameRoomCount/4)*28),width,height,rotation,shape});}
     state.settingsRoomId=roomId;save();closeModal();renderRoomSettings();renderTables();toast(editing?'Table modifiée':'Table créée');
   }
+  if(e.target.classList.contains('rotateTableSetting')){const t=state.tables.find(v=>Number(v.id)===Number(e.target.dataset.id));if(t){t.rotation=(Number(t.rotation||0)+90)%360;save();renderRoomSettings();toast(`Table ${t.number} tournée à ${t.rotation}°`)}}
   if(e.target.classList.contains('editTableSetting')){const t=state.tables.find(v=>Number(v.id)===Number(e.target.dataset.id));if(t)modal('Modifier la table',tableSettingsForm(t))}
   if(e.target.classList.contains('deleteTableSetting')){
     const id=Number(e.target.dataset.id),t=state.tables.find(v=>Number(v.id)===id);if(!t)return;
