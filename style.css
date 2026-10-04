@@ -293,3 +293,8 @@ main{padding:18px}
 .configurator-footer{display:grid;grid-template-columns:1fr 2fr;gap:9px}
 .configurator-footer button{min-height:50px;font-weight:900}
 @media(max-width:560px){.configurator-footer{grid-template-columns:1fr}}
+\n/* ===== v2.20 : ticket regroupé par produit puis variantes ===== */
+.ticket-product-group{margin:10px 0;padding-bottom:8px;border-bottom:1px dashed #d1d5db}
+.ticket-product-title{font-size:16px;font-weight:900;margin-bottom:5px}
+.ticket-variant{margin-left:18px;padding:3px 0;font-size:12px;font-weight:800}
+.ticket-variant-note{margin-left:18px;color:#991b1b;font-size:12px;font-weight:900}

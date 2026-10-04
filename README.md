@@ -1,3 +1,17 @@
+# Restaurant Pro v2.20 — Ticket regroupé par produit
+
+Le ticket regroupe maintenant le nom du produit une seule fois, puis affiche les variantes en dessous.
+
+Exemple :
+
+**3 × Entrecôte**
+- 2 × Saignant · Sauce poivre · Frites
+- 1 × À point · Béarnaise · Salade
+
+Pour les produits sans options : Coca + Bière + Coca devient **2 × Coca** et **1 × Bière**.
+
+Les séparations manuelles restent prioritaires.
+
 # Restaurant Pro v2.19 — Fenêtre automatique des options
 
 Quand un article possède une cuisson, une sauce ou une famille d’accompagnements, toucher le produit ouvre immédiatement une grande fenêtre.

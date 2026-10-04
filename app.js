@@ -330,46 +330,59 @@ function renderCart(){
 }
 qs('#clearCartBtn').onclick=()=>{if(!state.cart.length)return;state.cart=[];state.sent=false;state.dirty=false;save();renderCart()};
 
-function ticketItemKey(i){
-  return `${i.id}|${i.service||''}|${i.station||''}|${i.price}|${i.cooking||''}|${i.sauce||''}|${i.accompaniment||''}|${i.kitchenNote||''}`;
+function ticketVariantKey(i){
+  return [i.cooking||'',i.sauce||'',i.accompaniment||'',i.kitchenNote||'',i.service||''].join('|');
 }
-function regroupTicketSegment(items){
-  const out=[];
-  const map=new Map();
-  items.forEach(i=>{
-    const key=ticketItemKey(i);
-    if(map.has(key)){
-      map.get(key).qty+=Number(i.qty||1);
-    }else{
-      const copy={...i,qty:Number(i.qty||1),separatorAfter:false};
-      map.set(key,copy);
-      out.push(copy);
-    }
-  });
-  return out;
-}
-function buildTicketItems(items){
+function buildTicketProductGroups(items){
   const segments=cartSegments(items);
-  const out=[];
+  const result=[];
   segments.forEach(segment=>{
-    const hadSep=Boolean(segment[segment.length-1]?.separatorAfter);
-    const merged=regroupTicketSegment(segment);
-    if(hadSep&&merged.length)merged[merged.length-1].separatorAfter=true;
-    out.push(...merged);
+    const segmentGroups=[];
+    const productMap=new Map();
+    segment.forEach(i=>{
+      const productKey=`${i.id}|${i.station||''}|${i.price}`;
+      let group=productMap.get(productKey);
+      if(!group){
+        group={id:i.id,name:i.name,station:i.station,totalQty:0,variants:[],separatorAfter:false};
+        productMap.set(productKey,group);
+        segmentGroups.push(group);
+      }
+      group.totalQty+=Number(i.qty||1);
+      const variantKey=ticketVariantKey(i);
+      let variant=group.variants.find(v=>v.key===variantKey);
+      if(!variant){
+        variant={key:variantKey,qty:0,cooking:i.cooking||'',sauce:i.sauce||'',accompaniment:i.accompaniment||'',kitchenNote:i.kitchenNote||'',service:i.service||''};
+        group.variants.push(variant);
+      }
+      variant.qty+=Number(i.qty||1);
+    });
+    if(segmentGroups.length && segment[segment.length-1]?.separatorAfter){
+      segmentGroups[segmentGroups.length-1].separatorAfter=true;
+    }
+    result.push(...segmentGroups);
   });
-  return out;
+  return result;
 }
-function ticketOptions(i){
+function ticketVariantText(v){
   const parts=[];
-  if(i.cooking)parts.push(`🔥 Cuisson : ${esc(i.cooking)}`);
-  if(i.sauce)parts.push(`🥣 Sauce : ${esc(i.sauce)}`);
-  if(i.accompaniment)parts.push(`🍟 Accompagnement : ${esc(i.accompaniment)}`);
-  const options=parts.length?`<div class="ticket-options">${parts.join(' · ')}</div>`:'';
-  const note=i.kitchenNote?`<div class="ticket-note">💬 ${esc(i.kitchenNote)}</div>`:'';
-  return options+note;
+  if(v.cooking)parts.push(`🔥 ${esc(v.cooking)}`);
+  if(v.sauce)parts.push(`🥣 ${esc(v.sauce)}`);
+  if(v.accompaniment)parts.push(`🍟 ${esc(v.accompaniment)}`);
+  return parts.join(' · ');
 }
-function ticketItemHtml(i){
-  return `<div class="ticket-line"><b>${i.qty} × ${esc(i.name)}</b>${ticketOptions(i)}</div>${i.separatorAfter?'<div class="sep"></div>':''}`;
+function ticketProductGroupHtml(group){
+  const showVariants=group.variants.some(v=>v.cooking||v.sauce||v.accompaniment||v.kitchenNote);
+  const variantsHtml=showVariants ? group.variants.map(v=>{
+    const optionText=ticketVariantText(v);
+    return `<div class="ticket-variant">↳ ${v.qty} × ${optionText||'Sans option spéciale'}</div>${v.kitchenNote?`<div class="ticket-variant-note">💬 ${esc(v.kitchenNote)}</div>`:''}`;
+  }).join('') : '';
+  return `<div class="ticket-product-group"><div class="ticket-product-title">${group.totalQty} × ${esc(group.name)}</div>${variantsHtml}</div>${group.separatorAfter?'<div class="sep"></div>':''}`;
+}
+function ticketGroupsByStation(items){
+  const grouped=buildTicketProductGroups(items);
+  const stations={Cuisine:[],Bar:[],Dessert:[]};
+  grouped.forEach(g=>(stations[g.station]||stations.Cuisine).push(g));
+  return stations;
 }
 
 qs('#sendOrderBtn').onclick=()=>{
@@ -384,14 +397,12 @@ qs('#sendOrderBtn').onclick=()=>{
 
   if(state.currentMode==='table')state.openOrders[state.tableId]={items:structuredClone(state.cart),sentAt:new Date().toISOString()};
   state.sent=true;state.dirty=false;save();renderTables();renderCart();
-  const finalTicketItems=buildTicketItems(state.cart);
-  const groups={Cuisine:[],Bar:[],Dessert:[]};
-  finalTicketItems.forEach(i=>(groups[i.station]||groups.Cuisine).push(i));
+  const groups=ticketGroupsByStation(state.cart);
 
-  modal('Tickets envoyés — v2.17',
+  modal('Tickets envoyés — v2.20',
     Object.entries(groups)
       .filter(([,items])=>items.length)
-      .map(([station,items])=>`<div class="ticket"><b>${station.toUpperCase()}</b><hr>${items.map(ticketItemHtml).join('')}</div>`)
+      .map(([station,items])=>`<div class="ticket"><b>${station.toUpperCase()}</b><hr>${items.map(ticketProductGroupHtml).join('')}</div>`)
       .join('')
   )
 };
