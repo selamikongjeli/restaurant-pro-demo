@@ -1,4 +1,15 @@
-# Restaurant Pro v2.22 — Plan de salle personnalisable
+# Restaurant Pro v2.23 — Accès serveur limité
+
+## Nouveauté v2.23 — droits du serveur
+
+- Le profil **Serveur** voit uniquement **Caisse** et **Réservations**.
+- Les menus Produits, Options cuisine, Stock, Rapports, Comptabilité, Facturation et Paramètres sont masqués.
+- Une protection JavaScript empêche aussi un serveur d’ouvrir directement une page de gestion.
+- Le bouton Paramètres des réservations et l’ouverture/fermeture de caisse restent réservés au Responsable / Administrateur.
+- Les profils **Responsable** et **Administrateur** gardent l’accès complet.
+
+> Cette version GitHub Pages reste une démo locale côté navigateur. Pour une vraie sécurité en production, les permissions devront aussi être contrôlées côté serveur/API.
+
 
 ## Nouveauté v2.22 — dimensions, forme et rotation des tables
 

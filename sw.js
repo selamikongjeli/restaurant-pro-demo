@@ -1,4 +1,4 @@
-const CACHE='restaurant-pro-github-v221-20261005';
+const CACHE='restaurant-pro-github-v223-20261005';
 const ASSETS=['./','./index.html','./style.css?v=221','./app.js?v=221','./manifest.webmanifest'];
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});

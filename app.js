@@ -64,7 +64,7 @@ function load(){
     state.kitchenMessages=Array.isArray(state.kitchenMessages)&&state.kitchenMessages.length?state.kitchenMessages:[...defaults.kitchenMessages];
     state.nextAccompanimentGroupId=Number(state.nextAccompanimentGroupId||2);
 
-    // v2.22 — migration plan de salle / multi-salles + dimensions / rotation
+    // v2.23 — migration plan de salle + contrôle des accès par rôle
     state.rooms=Array.isArray(state.rooms)&&state.rooms.length?state.rooms:structuredClone(defaults.rooms);
     const firstRoomId=Number(state.rooms[0]?.id||1);
     state.tables=(Array.isArray(state.tables)?state.tables:[]).map((t,index)=>{
@@ -99,13 +99,39 @@ function localDateISO(d=new Date()){return `${d.getFullYear()}-${String(d.getMon
 function shiftDate(date,days){const d=new Date(`${date}T12:00:00`);d.setDate(d.getDate()+days);return localDateISO(d)}
 function timeToMinutes(v){const [h,m]=String(v||'00:00').split(':').map(Number);return (h||0)*60+(m||0)}
 function isManager(){return ['admin','manager'].includes(state.user?.role)}
+function isServer(){return state.user?.role==='server'}
+function canAccessPage(name){
+  if(isManager()) return true;
+  return ['pos','reservations'].includes(name);
+}
 
 function applyRole(){
+  // Serveur : uniquement Caisse + Réservations.
+  // Responsable / Admin : accès complet.
   qsa('.manager-only').forEach(el=>el.classList.toggle('hidden',!isManager()));
+
+  qsa('.navbtn').forEach(btn=>{
+    const allowed=canAccessPage(btn.dataset.page);
+    btn.classList.toggle('role-hidden',!allowed);
+    btn.disabled=!allowed;
+  });
+
+  // Si un serveur recharge la page alors qu'une ancienne section de gestion
+  // était affichée, on revient automatiquement à la caisse.
+  if(isServer()){
+    const visible=qsa('.page').find(p=>!p.classList.contains('hidden'));
+    const pageName=visible?.id?.replace('page-','');
+    if(pageName && !canAccessPage(pageName)){
+      qsa('.page').forEach(p=>p.classList.add('hidden'));
+      qs('#page-pos')?.classList.remove('hidden');
+      qsa('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.page==='pos'));
+    }
+  }
 }
 function showApp(){
   qs('#loginScreen').classList.add('hidden');qs('#app').classList.remove('hidden');
-  qs('#userBadge').textContent=`${state.user.name} · ${state.user.role}`;
+  const roleLabel=state.user?.role==='server'?'Serveur':state.user?.role==='manager'?'Responsable':'Administrateur';
+  qs('#userBadge').textContent=`${state.user.name} · ${roleLabel}`;
   applyRole();renderAll();
 }
 function login(){
@@ -118,6 +144,10 @@ qs('#loginBtn').onclick=login;qs('#loginPin').onkeydown=e=>{if(e.key==='Enter')l
 qs('#logoutBtn').onclick=()=>{state.user=null;save();location.reload()};
 
 function setPage(name){
+  if(!canAccessPage(name)){
+    toast('Accès réservé au responsable / administrateur');
+    return;
+  }
   qsa('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.page===name));
   qsa('.page').forEach(p=>p.classList.add('hidden'));
   qs(`#page-${name}`).classList.remove('hidden');
