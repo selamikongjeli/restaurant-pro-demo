@@ -1,3 +1,27 @@
+# Restaurant Pro v2.24 — Personnel, PIN, rôles et traçabilité
+
+## Nouveautés v2.24
+
+- Comptes du personnel configurables : **nom, identifiant, PIN et rôle**.
+- Rôle **Serveur** : uniquement **Caisse + Réservations**.
+- Rôle **Responsable** : Caisse, Réservations, Produits, Options cuisine, Stock et Rapports.
+- Rôle **Administrateur** : accès complet, y compris Comptabilité, Facturation, Paramètres et gestion du personnel.
+- Bouton **Changer d’utilisateur** dans la barre supérieure.
+- Verrouillage automatique configurable après inactivité (désactivé, 1, 5, 10, 15 ou 30 minutes).
+- Déverrouillage par PIN du compte connecté.
+- Le nom du serveur apparaît sur les commandes ouvertes, les tickets Cuisine / Bar / Dessert et le ticket client.
+- Chaque vente enregistre le membre du personnel qui l’a encaissée.
+- Les Rapports affichent les **ventes par serveur** et les **20 dernières ventes** avec l’utilisateur.
+- Protection contre la désactivation du compte actuellement connecté et contre la suppression du dernier administrateur actif.
+
+### Comptes de démonstration au premier démarrage
+
+- `admin / 3333` — Administrateur
+- `manager / 2222` — Responsable
+- `serveur / 1111` — Serveur
+
+> GitHub Pages reste une application locale côté navigateur : ces contrôles protègent l’utilisation normale de la démo, mais une vraie caisse en production doit vérifier les rôles et les sessions sur un serveur/API sécurisé.
+
 # Restaurant Pro v2.23 — Accès serveur limité
 
 ## Nouveauté v2.23 — droits du serveur

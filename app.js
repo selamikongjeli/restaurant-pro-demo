@@ -2,10 +2,18 @@
 const money=n=>new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR'}).format(Number(n||0));
 const qs=s=>document.querySelector(s),qsa=s=>[...document.querySelectorAll(s)];
 const STORAGE='restaurantProGithubDemoV211';
+const SESSION_USER='restaurantProSessionUserV224';
+let inactivityTimer=null,appLocked=false;
 let pendingProductConfig=null;
 
 const defaults={
-  user:null,cashOpen:false,cashOpening:0,currentMode:'table',tableId:null,category:'Plats',sent:false,dirty:false,payment:'card',
+  user:null,
+  users:[
+    {id:1,username:'admin',name:'Administrateur',pin:'3333',role:'admin',active:true},
+    {id:2,username:'manager',name:'Responsable',pin:'2222',role:'manager',active:true},
+    {id:3,username:'serveur',name:'Serveur',pin:'1111',role:'server',active:true}
+  ],nextUserId:4,
+  cashOpen:false,cashOpening:0,currentMode:'table',tableId:null,category:'Plats',sent:false,dirty:false,payment:'card',
   rooms:[{id:1,name:'Salle principale'}],nextRoomId:2,nextTableId:11,posRoomId:1,settingsRoomId:1,
   tables:[
     {id:1,number:1,name:'Table 1',seats:2,roomId:1,x:8,y:10},{id:2,number:2,name:'Table 2',seats:4,roomId:1,x:30,y:10},{id:3,number:3,name:'Table 3',seats:2,roomId:1,x:52,y:10},{id:4,number:4,name:'Table 4',seats:4,roomId:1,x:74,y:10},
@@ -37,12 +45,21 @@ const defaults={
     reservationsEnabled:true,maxReservationsPerDay:60,maxCoversPerDay:120,maxPartySize:20,minLeadMinutes:120,
     maxAdvanceDays:90,slotIntervalMinutes:30,defaultDurationMinutes:120,lunchEnabled:true,lunchStart:'12:00',lunchEnd:'14:30',
     dinnerEnabled:true,dinnerStart:'18:00',dinnerEnd:'22:00',enforceServiceHours:true,phoneRequired:true,
-    allowUnassignedTable:true,staffCanOverrideLimits:true
+    allowUnassignedTable:true,staffCanOverrideLimits:true,autoLockMinutes:10
   }
 };
 let state=structuredClone(defaults);
 
-function save(){localStorage.setItem(STORAGE,JSON.stringify(state))}
+function userSnapshot(u){
+  if(!u)return null;
+  return {id:Number(u.id||0),username:String(u.username||''),name:String(u.name||''),role:String(u.role||'server')};
+}
+function save(){
+  const snapshot={...state,user:null};
+  localStorage.setItem(STORAGE,JSON.stringify(snapshot));
+  if(state.user)sessionStorage.setItem(SESSION_USER,JSON.stringify(userSnapshot(state.user)));
+  else sessionStorage.removeItem(SESSION_USER);
+}
 function productNeedsCooking(p){
   return /entrec[oô]te|steak|filet de boeuf|filet de bœuf|burger/i.test(String(p?.name||''));
 }
@@ -64,7 +81,22 @@ function load(){
     state.kitchenMessages=Array.isArray(state.kitchenMessages)&&state.kitchenMessages.length?state.kitchenMessages:[...defaults.kitchenMessages];
     state.nextAccompanimentGroupId=Number(state.nextAccompanimentGroupId||2);
 
-    // v2.23 — migration plan de salle + contrôle des accès par rôle
+    // v2.24 — comptes du personnel et session navigateur
+    state.users=Array.isArray(state.users)&&state.users.length?state.users:structuredClone(defaults.users);
+    state.users=state.users.map((u,index)=>({
+      id:Number(u.id||index+1),username:String(u.username||u.name||('user'+(index+1))).trim().toLowerCase(),
+      name:String(u.name||u.username||('Utilisateur '+(index+1))).trim(),pin:String(u.pin||''),
+      role:['admin','manager','server'].includes(u.role)?u.role:'server',active:u.active!==false
+    }));
+    state.nextUserId=Math.max(Number(state.nextUserId||0)-1,...state.users.map(u=>Number(u.id)||0),0)+1;
+    state.settings={...defaults.settings,...(state.settings||{})};
+    try{
+      const su=JSON.parse(sessionStorage.getItem(SESSION_USER)||'null');
+      const account=su&&state.users.find(u=>u.active!==false&&(Number(u.id)===Number(su.id)||u.username===su.username));
+      state.user=account?userSnapshot(account):null;
+    }catch{state.user=null}
+
+    // v2.24 — migration plan de salle + comptes personnel / rôles
     state.rooms=Array.isArray(state.rooms)&&state.rooms.length?state.rooms:structuredClone(defaults.rooms);
     const firstRoomId=Number(state.rooms[0]?.id||1);
     state.tables=(Array.isArray(state.tables)?state.tables:[]).map((t,index)=>{
@@ -98,54 +130,68 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function localDateISO(d=new Date()){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function shiftDate(date,days){const d=new Date(`${date}T12:00:00`);d.setDate(d.getDate()+days);return localDateISO(d)}
 function timeToMinutes(v){const [h,m]=String(v||'00:00').split(':').map(Number);return (h||0)*60+(m||0)}
+function isAdmin(){return state.user?.role==='admin'}
 function isManager(){return ['admin','manager'].includes(state.user?.role)}
 function isServer(){return state.user?.role==='server'}
+function roleLabel(role){return role==='admin'?'Administrateur':role==='manager'?'Responsable':'Serveur'}
 function canAccessPage(name){
-  if(isManager()) return true;
+  if(isAdmin())return true;
+  if(state.user?.role==='manager')return ['pos','reservations','products','kitchen-options','stock','reports'].includes(name);
   return ['pos','reservations'].includes(name);
 }
+function currentAccount(){return state.users.find(u=>u.active!==false&&(Number(u.id)===Number(state.user?.id)||u.username===state.user?.username))||null}
+function normalizeLogin(v){return String(v||'').trim().toLowerCase()}
+function findLoginAccount(value){const v=normalizeLogin(value);return state.users.find(u=>u.active!==false&&(normalizeLogin(u.username)===v||normalizeLogin(u.name)===v))||null}
 
 function applyRole(){
-  // Serveur : uniquement Caisse + Réservations.
-  // Responsable / Admin : accès complet.
-  qsa('.manager-only').forEach(el=>el.classList.toggle('hidden',!isManager()));
-
-  qsa('.navbtn').forEach(btn=>{
-    const allowed=canAccessPage(btn.dataset.page);
-    btn.classList.toggle('role-hidden',!allowed);
-    btn.disabled=!allowed;
-  });
-
-  // Si un serveur recharge la page alors qu'une ancienne section de gestion
-  // était affichée, on revient automatiquement à la caisse.
-  if(isServer()){
-    const visible=qsa('.page').find(p=>!p.classList.contains('hidden'));
-    const pageName=visible?.id?.replace('page-','');
-    if(pageName && !canAccessPage(pageName)){
-      qsa('.page').forEach(p=>p.classList.add('hidden'));
-      qs('#page-pos')?.classList.remove('hidden');
-      qsa('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.page==='pos'));
-    }
+  qsa('.manager-only').forEach(el=>el.classList.toggle('role-hidden',!isManager()));
+  qsa('.admin-only').forEach(el=>el.classList.toggle('role-hidden',!isAdmin()));
+  qsa('.navbtn').forEach(btn=>{const allowed=canAccessPage(btn.dataset.page);btn.classList.toggle('role-hidden',!allowed);btn.disabled=!allowed});
+  const visible=qsa('.page').find(p=>!p.classList.contains('hidden'));
+  const pageName=visible?.id?.replace('page-','');
+  if(pageName&&!canAccessPage(pageName)){
+    qsa('.page').forEach(p=>p.classList.add('hidden'));qs('#page-pos')?.classList.remove('hidden');
+    qsa('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.page==='pos'));
   }
 }
 function showApp(){
   qs('#loginScreen').classList.add('hidden');qs('#app').classList.remove('hidden');
-  const roleLabel=state.user?.role==='server'?'Serveur':state.user?.role==='manager'?'Responsable':'Administrateur';
-  qs('#userBadge').textContent=`${state.user.name} · ${roleLabel}`;
-  applyRole();renderAll();
+  qs('#userBadge').textContent=`${state.user.name} · ${roleLabel(state.user.role)}`;
+  applyRole();renderAll();scheduleAutoLock();
 }
 function login(){
-  const u=qs('#loginUser').value.trim().toLowerCase(),p=qs('#loginPin').value;
-  const users={admin:{pin:'3333',role:'admin',name:'Admin'},manager:{pin:'2222',role:'manager',name:'Responsable'},serveur:{pin:'1111',role:'server',name:'Serveur'}};
-  if(!users[u]||users[u].pin!==p)return toast('Identifiants incorrects');
-  state.user={username:u,role:users[u].role,name:users[u].name};save();showApp()
+  const account=findLoginAccount(qs('#loginUser').value),pin=String(qs('#loginPin').value||'');
+  if(!account||account.pin!==pin)return toast('Nom / identifiant ou PIN incorrect');
+  state.user=userSnapshot(account);save();showApp();
 }
+function changeUser(){state.user=null;save();location.reload()}
 qs('#loginBtn').onclick=login;qs('#loginPin').onkeydown=e=>{if(e.key==='Enter')login()};
-qs('#logoutBtn').onclick=()=>{state.user=null;save();location.reload()};
+qs('#changeUserBtn').onclick=changeUser;qs('#logoutBtn').onclick=changeUser;
+
+function scheduleAutoLock(){
+  clearTimeout(inactivityTimer);inactivityTimer=null;
+  if(!state.user||appLocked)return;
+  const minutes=Number(state.settings.autoLockMinutes||0);if(minutes<=0)return;
+  inactivityTimer=setTimeout(lockApp,minutes*60*1000);
+}
+function noteActivity(){if(state.user&&!appLocked)scheduleAutoLock()}
+function lockApp(){
+  if(!state.user||appLocked)return;appLocked=true;clearTimeout(inactivityTimer);
+  qs('#lockUserName').textContent=`${state.user.name} · ${roleLabel(state.user.role)}`;
+  qs('#unlockPin').value='';qs('#lockScreen').classList.remove('hidden');setTimeout(()=>qs('#unlockPin')?.focus(),30);
+}
+function unlockApp(){
+  const account=currentAccount();
+  if(!account||String(qs('#unlockPin').value)!==String(account.pin))return toast('PIN incorrect');
+  appLocked=false;qs('#lockScreen').classList.add('hidden');qs('#unlockPin').value='';scheduleAutoLock();
+}
+qs('#unlockBtn').onclick=unlockApp;qs('#unlockPin').onkeydown=e=>{if(e.key==='Enter')unlockApp()};
+qs('#lockChangeUserBtn').onclick=changeUser;
+['pointerdown','keydown','touchstart'].forEach(ev=>document.addEventListener(ev,noteActivity,{passive:true}));
 
 function setPage(name){
   if(!canAccessPage(name)){
-    toast('Accès réservé au responsable / administrateur');
+    toast('Accès non autorisé pour ce profil');
     return;
   }
   qsa('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.page===name));
@@ -187,7 +233,7 @@ function tableRoomName(t){return roomById(t?.roomId)?.name||'Salle'}
 function tableStatusClass(t){const order=state.openOrders[t.id],res=tableReservationToday(t.id);return (order?' occupied':'')+(res?' reserved':'')+(Number(state.tableId)===Number(t.id)?' active':'')}
 function tableButtonInner(t){
   const order=state.openOrders[t.id],res=tableReservationToday(t.id);
-  return `<b>${esc(t.name||`Table ${t.number}`)}</b><br><small>N° ${esc(t.number)} · ${t.seats} places${order?' · OUVERTE':''}</small>${res?`<span class="reservation-label">R ${esc(res.time)} · ${esc(res.customerName)}</span>`:''}`;
+  return `<b>${esc(t.name||`Table ${t.number}`)}</b><br><small>N° ${esc(t.number)} · ${t.seats} places${order?' · OUVERTE':''}</small>${order?.serverName?`<span class="order-server-label">👤 ${esc(order.serverName)}</span>`:''}${res?`<span class="reservation-label">R ${esc(res.time)} · ${esc(res.customerName)}</span>`:''}`;
 }
 function renderTables(){
   // Compatibilité : si un ancien emplacement #tables existe encore, on l'alimente.
@@ -250,7 +296,7 @@ const quickTableInput=qs('#quickTableNumber');
 if(quickTableInput)quickTableInput.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();openTableByNumber()}};
 function renderContext(){
   let x=state.currentMode==='takeaway'?'Commande à emporter':state.currentMode==='delivery'?'Commande livraison':'Choisissez une table';
-  if(state.currentMode==='table'&&state.tableId){const t=state.tables.find(t=>t.id===state.tableId);if(t)x=`${tableRoomName(t)} · ${t.name}`;}
+  if(state.currentMode==='table'&&state.tableId){const t=state.tables.find(t=>t.id===state.tableId),o=state.openOrders[state.tableId];if(t)x=`${tableRoomName(t)} · ${t.name}${o?.serverName?' · Serveur : '+o.serverName:''}`;}
   qs('#orderContext').textContent=x
 }
 function renderCategories(){
@@ -497,14 +543,19 @@ qs('#sendOrderBtn').onclick=()=>{
   // Les lignes de séparation manuelles restent respectées.
   state.cart=consolidateCart(state.cart);
 
-  if(state.currentMode==='table')state.openOrders[state.tableId]={items:structuredClone(state.cart),sentAt:new Date().toISOString()};
+  if(state.currentMode==='table'){
+    const previous=state.openOrders[state.tableId]||{},staff=userSnapshot(state.user);
+    state.openOrders[state.tableId]={...previous,items:structuredClone(state.cart),sentAt:new Date().toISOString(),openedAt:previous.openedAt||new Date().toISOString(),createdBy:previous.createdBy||staff,lastHandledBy:staff,serverName:staff?.name||'—'};
+  }
   state.sent=true;state.dirty=false;save();renderTables();renderCart();
   const groups=ticketGroupsByStation(state.cart);
 
-  modal('Tickets envoyés — v2.20',
+  const orderLabel=state.currentMode==='table'&&state.tableId?(state.tables.find(t=>t.id===state.tableId)?.name||'Table'):(state.currentMode==='takeaway'?'Emporter':'Livraison');
+  const serverLabel=state.user?.name||'—';
+  modal('Tickets envoyés — v2.24',
     Object.entries(groups)
       .filter(([,items])=>items.length)
-      .map(([station,items])=>`<div class="ticket"><b>${station.toUpperCase()}</b><hr>${items.map(ticketProductGroupHtml).join('')}</div>`)
+      .map(([station,items])=>`<div class="ticket"><b>${station.toUpperCase()}</b><div class="ticket-meta">${esc(orderLabel)} · Serveur : ${esc(serverLabel)}</div><hr>${items.map(ticketProductGroupHtml).join('')}</div>`)
       .join('')
   )
 };
@@ -525,9 +576,10 @@ qs('#payBtn').onclick=()=>{
   if(qs('#payBtn').disabled)return;
   const total=state.cart.reduce((s,i)=>s+i.price*i.qty,0),vat={6:0,12:0,21:0};
   state.cart.forEach(i=>{const t=i.price*i.qty;vat[i.vat]+=t-t/(1+i.vat/100);const p=state.products.find(p=>p.id===i.id);if(p)p.stock=Math.max(0,p.stock-i.qty)});
-  state.payments.push({id:Date.now(),date:new Date().toISOString(),total,method:state.payment,vat,items:structuredClone(state.cart)});
+  const servedBy=userSnapshot(state.user),orderOwner=state.tableId?state.openOrders[state.tableId]?.createdBy:null;
+  state.payments.push({id:Date.now(),date:new Date().toISOString(),total,method:state.payment,vat,items:structuredClone(state.cart),servedBy,orderOwner:orderOwner||servedBy,tableId:state.tableId||null,mode:state.currentMode});
   if(state.tableId)delete state.openOrders[state.tableId];
-  const receipt=`<div class="ticket"><div style="text-align:center"><b>${esc(state.settings.establishmentName)}</b><br>Ticket démo</div><hr>${state.cart.map(i=>`<div style="display:flex;justify-content:space-between"><span>${i.qty} × ${esc(i.name)}</span><b>${money(i.qty*i.price)}</b></div>`).join('')}<hr><div style="display:flex;justify-content:space-between;font-size:18px"><b>TOTAL</b><b>${money(total)}</b></div><hr>${[6,12,21].filter(r=>vat[r]>0).map(r=>`TVA ${r}% : ${money(vat[r])}<br>`).join('')}</div>`;
+  const receipt=`<div class="ticket"><div style="text-align:center"><b>${esc(state.settings.establishmentName)}</b><br>Ticket démo<br><span class="ticket-meta">Serveur : ${esc(orderOwner?.name||servedBy?.name||'—')}${orderOwner?.name&&servedBy?.name&&orderOwner.name!==servedBy.name?' · Encaissement : '+esc(servedBy.name):''}</span></div><hr>${state.cart.map(i=>`<div style="display:flex;justify-content:space-between"><span>${i.qty} × ${esc(i.name)}</span><b>${money(i.qty*i.price)}</b></div>`).join('')}<hr><div style="display:flex;justify-content:space-between;font-size:18px"><b>TOTAL</b><b>${money(total)}</b></div><hr>${[6,12,21].filter(r=>vat[r]>0).map(r=>`TVA ${r}% : ${money(vat[r])}<br>`).join('')}</div>`;
   state.cart=[];state.sent=false;state.dirty=false;state.tableId=null;save();renderAll();modal('Ticket client',receipt)
 };
 
@@ -639,7 +691,10 @@ function renderReports(){
   const total=state.payments.reduce((s,p)=>s+p.total,0),today=localDateISO(),todayPays=state.payments.filter(p=>p.date.slice(0,10)===today),todayTotal=todayPays.reduce((s,p)=>s+p.total,0);
   qs('#reportStats').innerHTML=`<div class="stat"><span>CA total démo</span><b>${money(total)}</b></div><div class="stat"><span>CA aujourd’hui</span><b>${money(todayTotal)}</b></div><div class="stat"><span>Paiements</span><b>${state.payments.length}</b></div><div class="stat"><span>Commandes ouvertes</span><b>${Object.keys(state.openOrders).length}</b></div><div class="stat"><span>Réservations</span><b>${state.reservations.length}</b></div>`;
   const vat={6:0,12:0,21:0};state.payments.forEach(p=>[6,12,21].forEach(v=>vat[v]+=Number(p.vat?.[v]||0)));qs('#vatReport').innerHTML=`<h3>TVA</h3>${[6,12,21].map(v=>`TVA ${v}% : <b>${money(vat[v])}</b><br>`).join('')}`;
-  const pm={card:0,cash:0,meal:0};state.payments.forEach(p=>pm[p.method]=(pm[p.method]||0)+p.total);qs('#paymentsReport').innerHTML=`<h3>Moyens de paiement</h3>Carte : <b>${money(pm.card)}</b><br>Espèces : <b>${money(pm.cash)}</b><br>Chèque-repas : <b>${money(pm.meal)}</b>`
+  const pm={card:0,cash:0,meal:0};state.payments.forEach(p=>pm[p.method]=(pm[p.method]||0)+p.total);qs('#paymentsReport').innerHTML=`<h3>Moyens de paiement</h3>Carte : <b>${money(pm.card)}</b><br>Espèces : <b>${money(pm.cash)}</b><br>Chèque-repas : <b>${money(pm.meal)}</b>`;
+  const byStaff={};state.payments.forEach(p=>{const name=p.orderOwner?.name||p.servedBy?.name||'Ancienne vente / non attribuée';byStaff[name]=byStaff[name]||{count:0,total:0};byStaff[name].count++;byStaff[name].total+=Number(p.total||0)});
+  qs('#staffSalesReport').innerHTML=Object.entries(byStaff).sort((a,b)=>b[1].total-a[1].total).map(([name,v])=>`<div class="admin-row sales-row"><div><b>${esc(name)}</b></div><div>${v.count} vente(s)</div><div><b>${money(v.total)}</b></div><div></div></div>`).join('')||'<div class="empty">Aucune vente</div>';
+  qs('#recentSalesReport').innerHTML=[...state.payments].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,20).map(p=>{const orderStaff=p.orderOwner?.name||p.servedBy?.name||'Non attribuée',cashier=p.servedBy?.name||orderStaff,table=p.tableId?state.tables.find(t=>Number(t.id)===Number(p.tableId))?.name:'',mode=p.mode==='takeaway'?'Emporter':p.mode==='delivery'?'Livraison':(table||'Salle');return `<div class="admin-row sales-row"><div><b>${new Date(p.date).toLocaleString('fr-BE')}</b><div class="muted">${esc(mode)}</div></div><div>👤 ${esc(orderStaff)}${cashier!==orderStaff?`<div class="muted">Encaissement : ${esc(cashier)}</div>`:''}</div><div><b>${money(p.total)}</b></div><div>${esc(p.method==='cash'?'Espèces':p.method==='meal'?'Chèque-repas':'Carte')}</div></div>`}).join('')||'<div class="empty">Aucune vente</div>';
 }
 qs('#resetDemoBtn').onclick=()=>modal('Réinitialiser la démo',`<p>Supprimer toutes les données de démonstration de ce navigateur ?</p><button id="confirmReset" class="dangerbtn">Oui, réinitialiser</button>`);
 
@@ -711,11 +766,24 @@ function bindSettingsTableDrag(){
     };
   });
 }
+function personnelForm(u=null){
+  const x=u||{};
+  return `<div class="form-grid"><label class="span2">Nom affiché<input id="personName" value="${esc(x.name||'')}" placeholder="Ex. Jean Dupont"></label><label>Identifiant<input id="personUsername" value="${esc(x.username||'')}" placeholder="Ex. jean"></label><label>Rôle<select id="personRole"><option value="server" ${x.role==='server'||!x.role?'selected':''}>Serveur</option><option value="manager" ${x.role==='manager'?'selected':''}>Responsable</option><option value="admin" ${x.role==='admin'?'selected':''}>Administrateur</option></select></label><label class="span2">PIN ${u?'(laisser vide pour garder le PIN actuel)':''}<input id="personPin" type="password" inputmode="numeric" placeholder="Minimum 4 caractères"></label><button id="${u?'savePersonnelEdit':'savePersonnelCreate'}" ${u?`data-id="${u.id}"`:''} class="primary span3">${u?'Enregistrer':'Créer le compte'}</button></div>`;
+}
+function renderPersonnel(){
+  const list=qs('#personnelList');if(!list)return;
+  list.innerHTML=state.users.map(u=>`<div class="personnel-row ${u.active===false?'inactive':''}"><div><b>${esc(u.name)}</b><div class="muted">${esc(u.username)} · ${roleLabel(u.role)}</div></div><div><span class="status-pill ${u.active===false?'off':'on'}">${u.active===false?'Désactivé':'Actif'}</span></div><div class="personnel-actions"><button class="secondary editPersonnel" data-id="${u.id}">Modifier / PIN</button>${u.active===false?`<button class="primary reactivatePersonnel" data-id="${u.id}">Réactiver</button>`:`<button class="dangerbtn deactivatePersonnel" data-id="${u.id}">Désactiver</button>`}</div></div>`).join('');
+  const select=qs('#autoLockMinutes');if(select)select.value=String(Number(state.settings.autoLockMinutes||0));
+}
+function countActiveAdmins(exceptId=null){return state.users.filter(u=>u.active!==false&&u.role==='admin'&&Number(u.id)!==Number(exceptId)).length}
+
 function renderSettings(){
   qs('#generalEstablishmentName').value=state.settings.establishmentName;
-  renderRoomSettings();
+  renderPersonnel();renderRoomSettings();
 }
 qs('#saveGeneralSettingsBtn').onclick=()=>{state.settings.establishmentName=qs('#generalEstablishmentName').value.trim()||'Restaurant Pro';save();toast('Paramètres enregistrés')};
+qs('#addPersonnelBtn').onclick=()=>modal('Ajouter un utilisateur',personnelForm());
+qs('#autoLockMinutes').onchange=e=>{state.settings.autoLockMinutes=Number(e.target.value||0);save();scheduleAutoLock();toast(state.settings.autoLockMinutes?'Verrouillage automatique activé':'Verrouillage automatique désactivé')};
 qs('#settingsRoomSelect').onchange=e=>{state.settingsRoomId=Number(e.target.value);save();renderRoomSettings()};
 qs('#addRoomBtn').onclick=()=>modal('Ajouter une salle',`<div class="form-grid"><label class="span3">Nom de la salle<input id="newRoomName" placeholder="Ex. Terrasse, Étage, Salon..."></label><button id="saveRoomCreate" class="primary span3">Créer la salle</button></div>`);
 qs('#renameRoomBtn').onclick=()=>{const r=roomById(state.settingsRoomId);if(r)modal('Renommer la salle',`<div class="form-grid"><label class="span3">Nom<input id="renameRoomName" value="${esc(r.name)}"></label><button id="saveRoomRename" data-id="${r.id}" class="primary span3">Enregistrer</button></div>`)};
@@ -724,6 +792,32 @@ qs('#addTableBtn').onclick=()=>modal('Ajouter une table',tableSettingsForm());
 
 document.addEventListener('click',e=>{
   if(e.target.id==='modalClose')closeModal();
+
+  // ===== v2.24 : personnel, PIN et rôles =====
+  if(e.target.id==='savePersonnelCreate'||e.target.id==='savePersonnelEdit'){
+    if(!isAdmin())return toast('Accès administrateur requis');
+    const editing=e.target.id==='savePersonnelEdit',id=Number(e.target.dataset.id||0),name=qs('#personName')?.value.trim(),username=normalizeLogin(qs('#personUsername')?.value),role=qs('#personRole')?.value,pin=String(qs('#personPin')?.value||'');
+    if(!name||!username)return toast('Nom et identifiant obligatoires');
+    if(!/^[a-z0-9._-]{2,30}$/.test(username))return toast('Identifiant : lettres, chiffres, point, tiret ou _');
+    if(!['server','manager','admin'].includes(role))return toast('Rôle invalide');
+    if(state.users.some(u=>normalizeLogin(u.username)===username&&(!editing||Number(u.id)!==id)))return toast('Cet identifiant existe déjà');
+    if(!editing&&pin.length<4)return toast('PIN minimum 4 caractères');
+    if(editing){
+      const u=state.users.find(v=>Number(v.id)===id);if(!u)return;
+      if(u.role==='admin'&&role!=='admin'&&u.active!==false&&countActiveAdmins(id)<1)return toast('Il faut conserver au moins un administrateur actif');
+      Object.assign(u,{name,username,role});if(pin){if(pin.length<4)return toast('PIN minimum 4 caractères');u.pin=pin}
+      if(Number(state.user?.id)===id)state.user=userSnapshot(u);
+    }else state.users.push({id:state.nextUserId++,name,username,role,pin,active:true});
+    save();closeModal();renderPersonnel();applyRole();qs('#userBadge').textContent=`${state.user.name} · ${roleLabel(state.user.role)}`;toast(editing?'Utilisateur modifié':'Utilisateur créé');
+  }
+  if(e.target.classList.contains('editPersonnel')){const u=state.users.find(v=>Number(v.id)===Number(e.target.dataset.id));if(u)modal('Modifier utilisateur',personnelForm(u))}
+  if(e.target.classList.contains('deactivatePersonnel')){
+    const u=state.users.find(v=>Number(v.id)===Number(e.target.dataset.id));if(!u)return;
+    if(Number(u.id)===Number(state.user?.id))return toast('Impossible de désactiver le compte connecté');
+    if(u.role==='admin'&&countActiveAdmins(u.id)<1)return toast('Il faut conserver au moins un administrateur actif');
+    if(confirm(`Désactiver ${u.name} ?`)){u.active=false;save();renderPersonnel();toast('Utilisateur désactivé')}
+  }
+  if(e.target.classList.contains('reactivatePersonnel')){const u=state.users.find(v=>Number(v.id)===Number(e.target.dataset.id));if(u){u.active=true;save();renderPersonnel();toast('Utilisateur réactivé')}}
 
   // ===== v2.22 : sélection rapide + plan de salle =====
   if(e.target.matches('[data-table-digit]')){const input=qs('#quickTableNumber');if(input&&input.value.length<4)input.value+=e.target.dataset.tableDigit}

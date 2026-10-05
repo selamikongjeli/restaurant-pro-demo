@@ -4,19 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
-<title>Restaurant Pro v2.23 — Démo GitHub</title>
+<title>Restaurant Pro v2.24 — Personnel, PIN et rôles</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=221">
+<link rel="stylesheet" href="style.css?v=224">
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
   <div class="login-card">
     <div class="brand big">Restaurant <span>Pro</span></div>
     <p>Démo GitHub Pages</p>
-    <input id="loginUser" placeholder="Utilisateur" value="admin">
-    <input id="loginPin" type="password" placeholder="PIN" value="3333">
+    <input id="loginUser" placeholder="Nom ou identifiant" value="admin" autocomplete="username">
+    <input id="loginPin" type="password" inputmode="numeric" placeholder="PIN" value="3333" autocomplete="current-password">
     <button id="loginBtn" class="primary full">Connexion</button>
-    <div class="demo-logins">admin / 3333 · manager / 2222 · serveur / 1111</div>
+    <div class="login-help">Chaque membre du personnel se connecte avec son identifiant et son PIN.</div>
+    <div class="demo-logins">Démo : admin / 3333 · manager / 2222 · serveur / 1111</div>
   </div>
 </div>
 
@@ -24,12 +25,13 @@
 <header class="topbar">
   <div>
     <div class="brand">Restaurant <span>Pro</span></div>
-    <div class="sub">v2.23 · Démo gratuite GitHub Pages</div>
+    <div class="sub">v2.24 · Personnel, PIN et traçabilité</div>
   </div>
   <div class="top-actions">
     <span id="cashBadge" class="badge closed">Caisse fermée</span>
     <span id="userBadge" class="badge"></span>
-    <button id="logoutBtn" class="icon">⎋</button>
+    <button id="changeUserBtn" class="secondary compact-user-btn" title="Changer d’utilisateur">⇄ Utilisateur</button>
+    <button id="logoutBtn" class="icon" title="Déconnexion">⎋</button>
   </div>
 </header>
 <div class="compliance-banner">Démo de gestion — non certifiée SCE / Peppol</div>
@@ -41,9 +43,9 @@
   <button class="navbtn manager-only" data-page="kitchen-options">Options cuisine</button>
   <button class="navbtn manager-only" data-page="stock">Stock</button>
   <button class="navbtn manager-only" data-page="reports">Rapports</button>
-  <button class="navbtn manager-only" data-page="accounting">Comptabilité</button>
-  <button class="navbtn manager-only" data-page="invoices">Facturation</button>
-  <button class="navbtn manager-only" data-page="settings">Paramètres</button>
+  <button class="navbtn admin-only" data-page="accounting">Comptabilité</button>
+  <button class="navbtn admin-only" data-page="invoices">Facturation</button>
+  <button class="navbtn admin-only" data-page="settings">Paramètres</button>
 </nav>
 
 <main>
@@ -190,27 +192,49 @@
   <div id="reportStats" class="big-stats"></div>
   <div id="vatReport" class="report-card"></div>
   <div id="paymentsReport" class="report-card"></div>
+  <div class="report-card"><div class="section-title"><h3>Ventes par serveur</h3><span class="muted">Traçabilité</span></div><div id="staffSalesReport" class="admin-list"></div></div>
+  <div class="report-card"><div class="section-title"><h3>Dernières ventes</h3><span class="muted">20 dernières</span></div><div id="recentSalesReport" class="admin-list"></div></div>
 </section>
 
 
-<section id="page-accounting" class="page hidden manager-only">
+<section id="page-accounting" class="page hidden admin-only">
   <div class="section-title"><div><h1>Comptabilité</h1><div class="muted">Pré-comptabilité de gestion — démonstration</div></div><div class="accounting-actions"><button id="newExpenseBtn" class="primary">+ Dépense</button><button id="newSupplierBtn" class="secondary">+ Fournisseur</button><button id="exportAccountingCsvBtn" class="secondary">Exporter CSV</button></div></div>
   <div class="accounting-toolbar"><label>Période <select id="accountingPeriod"><option value="today">Aujourd’hui</option><option value="month" selected>Ce mois</option><option value="year">Cette année</option><option value="all">Tout</option></select></label></div>
   <div id="accountingStats" class="big-stats"></div>
   <div class="accounting-grid"><section class="report-card"><div class="section-title"><h2>Dépenses</h2><span id="expenseCount" class="muted"></span></div><div id="expensesList" class="admin-list"></div></section><section class="report-card"><div class="section-title"><h2>Fournisseurs</h2><span id="supplierCount" class="muted"></span></div><div id="suppliersList" class="admin-list"></div></section></div>
   <div class="accounting-grid"><section id="accountingVat" class="report-card"></section><section id="accountingCategories" class="report-card"></section></div>
 </section>
-<section id="page-invoices" class="page hidden manager-only">
+<section id="page-invoices" class="page hidden admin-only">
   <div class="section-title"><div><h1>Facturation</h1><div class="muted">Factures de démonstration — non Peppol</div></div><button id="newInvoiceBtn" class="primary">+ Nouvelle facture</button></div>
   <div id="invoiceStats" class="big-stats"></div><div id="invoicesList" class="admin-list"></div>
 </section>
 
-<section id="page-settings" class="page hidden manager-only">
+<section id="page-settings" class="page hidden admin-only">
   <div class="section-title"><h1>Paramètres démo</h1></div>
   <div class="settings-card">
     <p>Cette version fonctionne gratuitement dans GitHub Pages et sauvegarde les données uniquement dans ce navigateur.</p>
     <label>Nom de l’établissement<input id="generalEstablishmentName"></label>
     <button id="saveGeneralSettingsBtn" class="primary">Enregistrer</button>
+  </div>
+
+  <div class="settings-card personnel-settings-card">
+    <div class="section-title"><div><h2>👥 Personnel et accès</h2><div class="muted">Créez les comptes, attribuez les rôles et les PIN.</div></div><button id="addPersonnelBtn" class="primary">+ Ajouter un utilisateur</button></div>
+    <div class="access-role-grid">
+      <div><b>Serveur</b><span>Caisse + Réservations</span></div>
+      <div><b>Responsable</b><span>Caisse, Réservations, Produits, Options cuisine, Stock, Rapports</span></div>
+      <div><b>Administrateur</b><span>Accès complet</span></div>
+    </div>
+    <label class="autolock-setting">Verrouillage automatique après inactivité
+      <select id="autoLockMinutes">
+        <option value="0">Désactivé</option>
+        <option value="1">1 minute</option>
+        <option value="5">5 minutes</option>
+        <option value="10">10 minutes</option>
+        <option value="15">15 minutes</option>
+        <option value="30">30 minutes</option>
+      </select>
+    </label>
+    <div id="personnelList" class="personnel-list"></div>
   </div>
 
   <div class="settings-card room-settings-card">
@@ -230,6 +254,18 @@
 </main>
 </div>
 
+<div id="lockScreen" class="lock-screen hidden">
+  <div class="lock-card">
+    <div class="brand big">Restaurant <span>Pro</span></div>
+    <div class="lock-icon">🔒</div>
+    <h2>Session verrouillée</h2>
+    <p id="lockUserName" class="muted"></p>
+    <input id="unlockPin" type="password" inputmode="numeric" placeholder="PIN" autocomplete="current-password">
+    <button id="unlockBtn" class="primary full">Déverrouiller</button>
+    <button id="lockChangeUserBtn" class="secondary full">Changer d’utilisateur</button>
+  </div>
+</div>
+
 <div id="modal" class="modal hidden">
   <div class="modal-card">
     <div class="modal-head"><h3 id="modalTitle"></h3><button id="modalClose" class="icon">✕</button></div>
@@ -238,6 +274,6 @@
 </div>
 <button id="floatingReservationsBtn" class="floating-reservations">📅 Réservations</button>
 <div id="toast"></div>
-<script src="app.js?v=221"></script>
+<script src="app.js?v=224"></script>
 </body>
 </html>
