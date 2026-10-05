@@ -1,3 +1,34 @@
+# Restaurant Pro v2.25 — Multi-clients, multi-établissements et licences
+
+## Nouveautés v2.25
+
+- Nouveau rôle **Super Admin Restaurant Pro**, séparé des administrateurs des restaurants.
+- Console **🏢 Super Admin** pour créer et modifier des **clients**.
+- Chaque client peut posséder **un ou plusieurs établissements**.
+- Sélecteur d’établissement dans la barre supérieure.
+- Chaque établissement conserve séparément ses **salles/tables, produits, stock, réservations, commandes, ventes, rapports, comptabilité, factures et paramètres**.
+- Affectation du personnel à un ou plusieurs établissements du même client.
+- Un administrateur client ne voit pas les comptes des autres clients.
+- Gestion commerciale par établissement : formule **Basic / Pro / Multi-sites**, licence **active / suspendue / expirée** et date de fin.
+- Une licence suspendue ou expirée bloque la connexion des utilisateurs du restaurant concerné.
+- Le Super Admin peut ouvrir n’importe quel établissement depuis sa console.
+- Les versions v2.24 existantes sont migrées automatiquement vers un premier client et un premier établissement.
+
+### Comptes de démonstration
+
+- `superadmin / 9999` — Super Admin Restaurant Pro
+- `admin / 3333` — Administrateur du client démo
+- `manager / 2222` — Responsable
+- `serveur / 1111` — Serveur
+
+## Important avant commercialisation
+
+Cette v2.25 reste une **démo GitHub Pages** : les données, comptes et licences sont stockés dans `localStorage` du navigateur. La séparation multi-clients est fonctionnelle pour la démonstration, mais **ce n’est pas une sécurité SaaS de production**.
+
+Pour vendre Restaurant Pro à de vrais clients, l’étape suivante est de déplacer les comptes, sessions, licences et données vers une **API sécurisée + PostgreSQL**, avec contrôle des droits côté serveur, sauvegardes et isolation des clients.
+
+---
+
 # Restaurant Pro v2.24 — Personnel, PIN, rôles et traçabilité
 
 ## Nouveautés v2.24

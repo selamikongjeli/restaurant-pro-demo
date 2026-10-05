@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
-<title>Restaurant Pro v2.24 — Personnel, PIN et rôles</title>
+<title>Restaurant Pro v2.25 — Multi-clients et établissements</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=224">
+<link rel="stylesheet" href="style.css?v=225">
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
@@ -17,7 +17,7 @@
     <input id="loginPin" type="password" inputmode="numeric" placeholder="PIN" value="3333" autocomplete="current-password">
     <button id="loginBtn" class="primary full">Connexion</button>
     <div class="login-help">Chaque membre du personnel se connecte avec son identifiant et son PIN.</div>
-    <div class="demo-logins">Démo : admin / 3333 · manager / 2222 · serveur / 1111</div>
+    <div class="demo-logins">Démo : admin / 3333 · manager / 2222 · serveur / 1111 · superadmin / 9999</div>
   </div>
 </div>
 
@@ -25,9 +25,11 @@
 <header class="topbar">
   <div>
     <div class="brand">Restaurant <span>Pro</span></div>
-    <div class="sub">v2.24 · Personnel, PIN et traçabilité</div>
+    <div class="sub">v2.25 · Multi-clients, établissements et licences</div>
   </div>
   <div class="top-actions">
+    <select id="establishmentSwitcher" class="establishment-switcher" title="Changer d’établissement"></select>
+    <span id="licenseBadge" class="badge license-active">PRO · active</span>
     <span id="cashBadge" class="badge closed">Caisse fermée</span>
     <span id="userBadge" class="badge"></span>
     <button id="changeUserBtn" class="secondary compact-user-btn" title="Changer d’utilisateur">⇄ Utilisateur</button>
@@ -46,6 +48,7 @@
   <button class="navbtn admin-only" data-page="accounting">Comptabilité</button>
   <button class="navbtn admin-only" data-page="invoices">Facturation</button>
   <button class="navbtn admin-only" data-page="settings">Paramètres</button>
+  <button class="navbtn superadmin-only" data-page="superadmin">🏢 Super Admin</button>
 </nav>
 
 <main>
@@ -251,6 +254,13 @@
     <div id="settingsTablesList" class="room-tables-list"></div>
   </div>
 </section>
+
+<section id="page-superadmin" class="page hidden superadmin-only">
+  <div class="section-title"><div><h1>🏢 Super Admin Restaurant Pro</h1><div class="muted">Clients, établissements, formules et licences.</div></div><button id="addClientBtn" class="primary">+ Nouveau client</button></div>
+  <div class="commercial-warning">Cette console v2.25 simule l’administration commerciale dans le navigateur. Pour vendre en production, les comptes, licences et données devront être stockés et contrôlés sur le serveur.</div>
+  <div id="saStats" class="big-stats"></div>
+  <div id="clientsAdminList" class="sa-client-list"></div>
+</section>
 </main>
 </div>
 
@@ -274,6 +284,6 @@
 </div>
 <button id="floatingReservationsBtn" class="floating-reservations">📅 Réservations</button>
 <div id="toast"></div>
-<script src="app.js?v=224"></script>
+<script src="app.js?v=225"></script>
 </body>
 </html>

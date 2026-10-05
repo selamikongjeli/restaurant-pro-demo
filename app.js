@@ -2,17 +2,20 @@
 const money=n=>new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR'}).format(Number(n||0));
 const qs=s=>document.querySelector(s),qsa=s=>[...document.querySelectorAll(s)];
 const STORAGE='restaurantProGithubDemoV211';
-const SESSION_USER='restaurantProSessionUserV224';
+const SESSION_USER='restaurantProSessionUserV225';
 let inactivityTimer=null,appLocked=false;
 let pendingProductConfig=null;
 
 const defaults={
   user:null,
   users:[
-    {id:1,username:'admin',name:'Administrateur',pin:'3333',role:'admin',active:true},
-    {id:2,username:'manager',name:'Responsable',pin:'2222',role:'manager',active:true},
-    {id:3,username:'serveur',name:'Serveur',pin:'1111',role:'server',active:true}
-  ],nextUserId:4,
+    {id:1,username:'admin',name:'Administrateur',pin:'3333',role:'admin',active:true,clientId:1,establishmentIds:[1]},
+    {id:2,username:'manager',name:'Responsable',pin:'2222',role:'manager',active:true,clientId:1,establishmentIds:[1]},
+    {id:3,username:'serveur',name:'Serveur',pin:'1111',role:'server',active:true,clientId:1,establishmentIds:[1]},
+    {id:4,username:'superadmin',name:'Super Admin Restaurant Pro',pin:'9999',role:'superadmin',active:true,clientId:null,establishmentIds:[]}
+  ],nextUserId:5,
+  clients:[{id:1,name:'Client démo',companyName:'Restaurant Pro Démo',vatNumber:'',email:'',phone:'',active:true}],nextClientId:2,
+  establishments:[{id:1,clientId:1,name:'Restaurant Pro',address:'',phone:'',email:'',plan:'pro',licenseStatus:'active',licenseEnd:'',active:true}],nextEstablishmentId:2,currentEstablishmentId:1,establishmentData:{},
   cashOpen:false,cashOpening:0,currentMode:'table',tableId:null,category:'Plats',sent:false,dirty:false,payment:'card',
   rooms:[{id:1,name:'Salle principale'}],nextRoomId:2,nextTableId:11,posRoomId:1,settingsRoomId:1,
   tables:[
@@ -50,11 +53,74 @@ const defaults={
 };
 let state=structuredClone(defaults);
 
+// ===== v2.25 : multi-clients / multi-établissements =====
+const ESTABLISHMENT_FIELDS=[
+  'cashOpen','cashOpening','currentMode','tableId','category','sent','dirty','payment','rooms','nextRoomId','nextTableId','posRoomId','settingsRoomId','tables','products','cart','openOrders','payments','reservations','nextReservationId','nextProductId','expenses','suppliers','invoices','nextExpenseId','nextSupplierId','nextInvoiceId','accompanimentGroups','kitchenMessages','nextAccompanimentGroupId','reservationDate','reservationSearch','reservationStatusFilter','settings'
+];
+function establishmentSnapshotFrom(source){
+  const out={};ESTABLISHMENT_FIELDS.forEach(k=>out[k]=structuredClone(source[k]));return out;
+}
+function freshEstablishmentData(name='Nouvel établissement'){
+  const out=establishmentSnapshotFrom(defaults);
+  out.settings={...out.settings,establishmentName:name};out.cashOpen=false;out.cashOpening=0;out.tableId=null;out.cart=[];out.openOrders={};out.payments=[];out.reservations=[];out.expenses=[];out.suppliers=[];out.invoices=[];return out;
+}
+function currentEstablishment(){return state.establishments?.find(e=>Number(e.id)===Number(state.currentEstablishmentId))||null}
+function currentClient(){const e=currentEstablishment();return state.clients?.find(c=>Number(c.id)===Number(e?.clientId))||null}
+function licenseEffectiveStatus(est){
+  if(!est||est.active===false)return 'suspended';
+  if(est.licenseStatus==='suspended')return 'suspended';
+  if(est.licenseStatus==='expired')return 'expired';
+  if(est.licenseEnd&&est.licenseEnd<localDateISO())return 'expired';
+  return 'active';
+}
+function isEstablishmentLicensed(est){return licenseEffectiveStatus(est)==='active'}
+function userCanUseEstablishment(user,est){
+  if(!user||!est)return false;if(user.role==='superadmin')return true;
+  if(Number(user.clientId)!==Number(est.clientId))return false;
+  return Array.isArray(user.establishmentIds)&&user.establishmentIds.map(Number).includes(Number(est.id));
+}
+function accessibleEstablishments(user=state.user){return (state.establishments||[]).filter(e=>e.active!==false&&userCanUseEstablishment(user,e))}
+function syncCurrentEstablishmentData(){
+  if(!state.currentEstablishmentId)return;state.establishmentData=state.establishmentData||{};
+  state.establishmentData[String(state.currentEstablishmentId)]=establishmentSnapshotFrom(state);
+}
+function applyEstablishmentData(id){
+  const est=state.establishments.find(e=>Number(e.id)===Number(id));if(!est)return false;
+  state.establishmentData=state.establishmentData||{};
+  if(!state.establishmentData[String(id)])state.establishmentData[String(id)]=freshEstablishmentData(est.name);
+  const data=state.establishmentData[String(id)];ESTABLISHMENT_FIELDS.forEach(k=>state[k]=structuredClone(data[k]));
+  state.settings={...defaults.settings,...(state.settings||{}),establishmentName:est.name||state.settings?.establishmentName||'Restaurant Pro'};return true;
+}
+function normalizeOperationalData(){
+  state.products=(state.products||[]).map(p=>({...p,askCooking:p.askCooking!==undefined?Boolean(p.askCooking):productNeedsCooking(p),askSauce:p.askSauce!==undefined?Boolean(p.askSauce):productNeedsSauce(p),accompanimentGroupId:p.accompanimentGroupId!==undefined?p.accompanimentGroupId:(p.cat==='Plats'?1:null),allowKitchenMessage:p.allowKitchenMessage!==undefined?Boolean(p.allowKitchenMessage):true}));
+  state.accompanimentGroups=Array.isArray(state.accompanimentGroups)&&state.accompanimentGroups.length?state.accompanimentGroups:structuredClone(defaults.accompanimentGroups);
+  state.kitchenMessages=Array.isArray(state.kitchenMessages)&&state.kitchenMessages.length?state.kitchenMessages:[...defaults.kitchenMessages];
+  state.rooms=Array.isArray(state.rooms)&&state.rooms.length?state.rooms:structuredClone(defaults.rooms);
+  const firstRoomId=Number(state.rooms[0]?.id||1);
+  state.tables=(Array.isArray(state.tables)?state.tables:[]).map((t,index)=>{const guessedNumber=Number(t.number||String(t.name||'').match(/\d+/)?.[0]||t.id||index+1),col=index%4,row=Math.floor(index/4);return {...t,id:Number(t.id||index+1),number:guessedNumber,name:t.name||`Table ${guessedNumber}`,seats:Number(t.seats||2),roomId:Number(t.roomId||firstRoomId),x:Number.isFinite(Number(t.x))?Number(t.x):8+(col*22),y:Number.isFinite(Number(t.y))?Number(t.y):10+(row*28),width:Math.max(56,Math.min(220,Number(t.width||100))),height:Math.max(42,Math.min(160,Number(t.height||72))),rotation:[0,90,180,270].includes(Number(t.rotation))?Number(t.rotation):0,shape:['rectangle','rounded','round'].includes(t.shape)?t.shape:'rounded'}});
+  state.nextRoomId=Math.max(Number(state.nextRoomId||0)-1,...state.rooms.map(r=>Number(r.id)||0),0)+1;state.nextTableId=Math.max(Number(state.nextTableId||0)-1,...state.tables.map(t=>Number(t.id)||0),0)+1;
+  if(!state.rooms.some(r=>Number(r.id)===Number(state.posRoomId)))state.posRoomId=firstRoomId;if(!state.rooms.some(r=>Number(r.id)===Number(state.settingsRoomId)))state.settingsRoomId=firstRoomId;
+  state.settings={...defaults.settings,...(state.settings||{})};
+}
+function updateCurrentEstablishmentName(name){const e=currentEstablishment();if(e){e.name=name;e.updatedAt=new Date().toISOString()}state.settings.establishmentName=name}
+function renderEstablishmentSwitcher(){
+  const sel=qs('#establishmentSwitcher'),badge=qs('#licenseBadge');if(!sel)return;
+  const list=accessibleEstablishments();sel.innerHTML=list.map(e=>`<option value="${e.id}" ${Number(e.id)===Number(state.currentEstablishmentId)?'selected':''}>${esc(e.name)}</option>`).join('');
+  sel.classList.toggle('hidden',list.length<=1&&state.user?.role!=='superadmin');
+  const e=currentEstablishment(),status=licenseEffectiveStatus(e);if(badge){badge.textContent=status==='active'?`${String(e?.plan||'pro').toUpperCase()} · active`:status==='expired'?'Licence expirée':'Licence suspendue';badge.className=`badge license-${status}`}
+}
+function switchEstablishment(id){
+  id=Number(id);const est=state.establishments.find(e=>Number(e.id)===id);if(!est||!userCanUseEstablishment(state.user,est))return toast('Accès non autorisé à cet établissement');
+  if(state.user?.role!=='superadmin'&&!isEstablishmentLicensed(est))return toast('Licence inactive pour cet établissement');
+  syncCurrentEstablishmentData();state.currentEstablishmentId=id;applyEstablishmentData(id);normalizeOperationalData();save();renderEstablishmentSwitcher();renderAll();applyRole();toast(`Établissement : ${est.name}`);
+}
+
 function userSnapshot(u){
   if(!u)return null;
-  return {id:Number(u.id||0),username:String(u.username||''),name:String(u.name||''),role:String(u.role||'server')};
+  return {id:Number(u.id||0),username:String(u.username||''),name:String(u.name||''),role:String(u.role||'server'),clientId:u.clientId==null?null:Number(u.clientId),establishmentIds:Array.isArray(u.establishmentIds)?u.establishmentIds.map(Number):[]};
 }
 function save(){
+  syncCurrentEstablishmentData();
   const snapshot={...state,user:null};
   localStorage.setItem(STORAGE,JSON.stringify(snapshot));
   if(state.user)sessionStorage.setItem(SESSION_USER,JSON.stringify(userSnapshot(state.user)));
@@ -86,9 +152,21 @@ function load(){
     state.users=state.users.map((u,index)=>({
       id:Number(u.id||index+1),username:String(u.username||u.name||('user'+(index+1))).trim().toLowerCase(),
       name:String(u.name||u.username||('Utilisateur '+(index+1))).trim(),pin:String(u.pin||''),
-      role:['admin','manager','server'].includes(u.role)?u.role:'server',active:u.active!==false
+      role:['superadmin','admin','manager','server'].includes(u.role)?u.role:'server',active:u.active!==false,
+      clientId:u.role==='superadmin'?null:Number(u.clientId||1),establishmentIds:u.role==='superadmin'?[]:(Array.isArray(u.establishmentIds)&&u.establishmentIds.length?u.establishmentIds.map(Number):[1])
     }));
+    if(!state.users.some(u=>u.role==='superadmin'))state.users.push({id:Math.max(4,...state.users.map(u=>Number(u.id)||0))+1,username:'superadmin',name:'Super Admin Restaurant Pro',pin:'9999',role:'superadmin',active:true,clientId:null,establishmentIds:[]});
     state.nextUserId=Math.max(Number(state.nextUserId||0)-1,...state.users.map(u=>Number(u.id)||0),0)+1;
+    // v2.25 — migration commerciale : client, établissements et jeux de données séparés
+    state.clients=Array.isArray(state.clients)&&state.clients.length?state.clients:structuredClone(defaults.clients);
+    state.establishments=Array.isArray(state.establishments)&&state.establishments.length?state.establishments:structuredClone(defaults.establishments);
+    state.nextClientId=Math.max(Number(state.nextClientId||0)-1,...state.clients.map(v=>Number(v.id)||0),0)+1;
+    state.nextEstablishmentId=Math.max(Number(state.nextEstablishmentId||0)-1,...state.establishments.map(v=>Number(v.id)||0),0)+1;
+    state.currentEstablishmentId=Number(state.currentEstablishmentId||state.establishments[0]?.id||1);
+    state.establishmentData=state.establishmentData&&typeof state.establishmentData==='object'?state.establishmentData:{};
+    if(!Object.keys(state.establishmentData).length)state.establishmentData[String(state.currentEstablishmentId)]=establishmentSnapshotFrom(state);
+    if(!state.establishments.some(e=>Number(e.id)===Number(state.currentEstablishmentId)))state.currentEstablishmentId=Number(state.establishments[0]?.id||1);
+    applyEstablishmentData(state.currentEstablishmentId);
     state.settings={...defaults.settings,...(state.settings||{})};
     try{
       const su=JSON.parse(sessionStorage.getItem(SESSION_USER)||'null');
@@ -130,12 +208,14 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function localDateISO(d=new Date()){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function shiftDate(date,days){const d=new Date(`${date}T12:00:00`);d.setDate(d.getDate()+days);return localDateISO(d)}
 function timeToMinutes(v){const [h,m]=String(v||'00:00').split(':').map(Number);return (h||0)*60+(m||0)}
-function isAdmin(){return state.user?.role==='admin'}
-function isManager(){return ['admin','manager'].includes(state.user?.role)}
+function isSuperAdmin(){return state.user?.role==='superadmin'}
+function isAdmin(){return ['superadmin','admin'].includes(state.user?.role)}
+function isManager(){return ['superadmin','admin','manager'].includes(state.user?.role)}
 function isServer(){return state.user?.role==='server'}
-function roleLabel(role){return role==='admin'?'Administrateur':role==='manager'?'Responsable':'Serveur'}
+function roleLabel(role){return role==='superadmin'?'Super Admin':role==='admin'?'Administrateur':role==='manager'?'Responsable':'Serveur'}
 function canAccessPage(name){
-  if(isAdmin())return true;
+  if(isSuperAdmin())return true;
+  if(state.user?.role==='admin')return name!=='superadmin';
   if(state.user?.role==='manager')return ['pos','reservations','products','kitchen-options','stock','reports'].includes(name);
   return ['pos','reservations'].includes(name);
 }
@@ -146,6 +226,7 @@ function findLoginAccount(value){const v=normalizeLogin(value);return state.user
 function applyRole(){
   qsa('.manager-only').forEach(el=>el.classList.toggle('role-hidden',!isManager()));
   qsa('.admin-only').forEach(el=>el.classList.toggle('role-hidden',!isAdmin()));
+  qsa('.superadmin-only').forEach(el=>el.classList.toggle('role-hidden',!isSuperAdmin()));
   qsa('.navbtn').forEach(btn=>{const allowed=canAccessPage(btn.dataset.page);btn.classList.toggle('role-hidden',!allowed);btn.disabled=!allowed});
   const visible=qsa('.page').find(p=>!p.classList.contains('hidden'));
   const pageName=visible?.id?.replace('page-','');
@@ -157,12 +238,17 @@ function applyRole(){
 function showApp(){
   qs('#loginScreen').classList.add('hidden');qs('#app').classList.remove('hidden');
   qs('#userBadge').textContent=`${state.user.name} · ${roleLabel(state.user.role)}`;
-  applyRole();renderAll();scheduleAutoLock();
+  applyRole();renderEstablishmentSwitcher();renderAll();scheduleAutoLock();
 }
 function login(){
   const account=findLoginAccount(qs('#loginUser').value),pin=String(qs('#loginPin').value||'');
   if(!account||account.pin!==pin)return toast('Nom / identifiant ou PIN incorrect');
-  state.user=userSnapshot(account);save();showApp();
+  state.user=userSnapshot(account);
+  const list=accessibleEstablishments(state.user);
+  if(!list.length){state.user=null;return toast('Aucun établissement autorisé pour ce compte')}
+  let target=state.establishments.find(e=>Number(e.id)===Number(state.currentEstablishmentId)&&userCanUseEstablishment(state.user,e))||list[0];
+  if(state.user.role!=='superadmin'){target=target&&isEstablishmentLicensed(target)?target:(list.find(isEstablishmentLicensed)||null);if(!target){state.user=null;return toast('Licence inactive : contactez votre administrateur')}}
+  state.currentEstablishmentId=Number(target.id);applyEstablishmentData(target.id);normalizeOperationalData();save();showApp();
 }
 function changeUser(){state.user=null;save();location.reload()}
 qs('#loginBtn').onclick=login;qs('#loginPin').onkeydown=e=>{if(e.key==='Enter')login()};
@@ -207,9 +293,11 @@ function setPage(name){
   if(name==='accounting')renderAccounting();
   if(name==='invoices')renderInvoices();
   if(name==='settings')renderSettings();
+  if(name==='superadmin')renderSuperAdmin();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 qsa('.navbtn').forEach(b=>b.onclick=()=>setPage(b.dataset.page));
+qs('#establishmentSwitcher').onchange=e=>switchEstablishment(e.target.value);
 qs('#quickReservationsBtn').onclick=()=>setPage('reservations');
 qs('#floatingReservationsBtn').onclick=()=>setPage('reservations');
 
@@ -767,21 +855,41 @@ function bindSettingsTableDrag(){
   });
 }
 function personnelForm(u=null){
-  const x=u||{};
-  return `<div class="form-grid"><label class="span2">Nom affiché<input id="personName" value="${esc(x.name||'')}" placeholder="Ex. Jean Dupont"></label><label>Identifiant<input id="personUsername" value="${esc(x.username||'')}" placeholder="Ex. jean"></label><label>Rôle<select id="personRole"><option value="server" ${x.role==='server'||!x.role?'selected':''}>Serveur</option><option value="manager" ${x.role==='manager'?'selected':''}>Responsable</option><option value="admin" ${x.role==='admin'?'selected':''}>Administrateur</option></select></label><label class="span2">PIN ${u?'(laisser vide pour garder le PIN actuel)':''}<input id="personPin" type="password" inputmode="numeric" placeholder="Minimum 4 caractères"></label><button id="${u?'savePersonnelEdit':'savePersonnelCreate'}" ${u?`data-id="${u.id}"`:''} class="primary span3">${u?'Enregistrer':'Créer le compte'}</button></div>`;
+  const x=u||{},clientId=Number(x.clientId||currentEstablishment()?.clientId||0);
+  const ests=(state.establishments||[]).filter(e=>Number(e.clientId)===clientId&&e.active!==false);
+  const selected=new Set((Array.isArray(x.establishmentIds)&&x.establishmentIds.length?x.establishmentIds:[state.currentEstablishmentId]).map(Number));
+  return `<div class="form-grid"><label class="span2">Nom affiché<input id="personName" value="${esc(x.name||'')}" placeholder="Ex. Jean Dupont"></label><label>Identifiant<input id="personUsername" value="${esc(x.username||'')}" placeholder="Ex. jean"></label><label>Rôle<select id="personRole"><option value="server" ${x.role==='server'||!x.role?'selected':''}>Serveur</option><option value="manager" ${x.role==='manager'?'selected':''}>Responsable</option><option value="admin" ${x.role==='admin'?'selected':''}>Administrateur</option></select></label><label class="span2">PIN ${u?'(laisser vide pour garder le PIN actuel)':''}<input id="personPin" type="password" inputmode="numeric" placeholder="Minimum 4 caractères"></label><div class="span3 establishment-access-box"><b>Établissements autorisés</b>${ests.map(e=>`<label class="checkline"><input type="checkbox" class="personEstablishmentAccess" value="${e.id}" ${selected.has(Number(e.id))?'checked':''}> ${esc(e.name)}</label>`).join('')||'<div class="muted">Aucun établissement</div>'}</div><button id="${u?'savePersonnelEdit':'savePersonnelCreate'}" ${u?`data-id="${u.id}"`:''} class="primary span3">${u?'Enregistrer':'Créer le compte'}</button></div>`;
 }
 function renderPersonnel(){
   const list=qs('#personnelList');if(!list)return;
-  list.innerHTML=state.users.map(u=>`<div class="personnel-row ${u.active===false?'inactive':''}"><div><b>${esc(u.name)}</b><div class="muted">${esc(u.username)} · ${roleLabel(u.role)}</div></div><div><span class="status-pill ${u.active===false?'off':'on'}">${u.active===false?'Désactivé':'Actif'}</span></div><div class="personnel-actions"><button class="secondary editPersonnel" data-id="${u.id}">Modifier / PIN</button>${u.active===false?`<button class="primary reactivatePersonnel" data-id="${u.id}">Réactiver</button>`:`<button class="dangerbtn deactivatePersonnel" data-id="${u.id}">Désactiver</button>`}</div></div>`).join('');
+  const clientId=Number(currentEstablishment()?.clientId||0);
+  const users=state.users.filter(u=>u.role!=='superadmin'&&Number(u.clientId||clientId)===clientId);
+  list.innerHTML=users.map(u=>`<div class="personnel-row ${u.active===false?'inactive':''}"><div><b>${esc(u.name)}</b><div class="muted">${esc(u.username)} · ${roleLabel(u.role)}</div></div><div><span class="status-pill ${u.active===false?'off':'on'}">${u.active===false?'Désactivé':'Actif'}</span></div><div class="personnel-actions"><button class="secondary editPersonnel" data-id="${u.id}">Modifier / PIN</button>${u.active===false?`<button class="primary reactivatePersonnel" data-id="${u.id}">Réactiver</button>`:`<button class="dangerbtn deactivatePersonnel" data-id="${u.id}">Désactiver</button>`}</div></div>`).join('');
   const select=qs('#autoLockMinutes');if(select)select.value=String(Number(state.settings.autoLockMinutes||0));
 }
-function countActiveAdmins(exceptId=null){return state.users.filter(u=>u.active!==false&&u.role==='admin'&&Number(u.id)!==Number(exceptId)).length}
+function countActiveAdmins(exceptId=null){const clientId=Number(currentEstablishment()?.clientId||0);return state.users.filter(u=>u.active!==false&&u.role==='admin'&&Number(u.clientId)===clientId&&Number(u.id)!==Number(exceptId)).length}
+
+// ===== v2.25 : console Super Admin / licences =====
+function clientById(id){return state.clients.find(c=>Number(c.id)===Number(id))||null}
+function planLabel(plan){return plan==='basic'?'Basic':plan==='multi'?'Multi-sites':'Pro'}
+function establishmentSalesTotal(id){const data=Number(id)===Number(state.currentEstablishmentId)?state:state.establishmentData?.[String(id)];return (data?.payments||[]).reduce((a,p)=>a+Number(p.total||0),0)}
+function clientForm(c=null){const x=c||{};return `<div class="form-grid"><label class="span2">Nom client<input id="clientName" value="${esc(x.name||'')}" placeholder="Ex. Groupe Dupont"></label><label class="span2">Société<input id="clientCompany" value="${esc(x.companyName||'')}"></label><label>N° TVA<input id="clientVat" value="${esc(x.vatNumber||'')}"></label><label>Email<input id="clientEmail" type="email" value="${esc(x.email||'')}"></label><label>Téléphone<input id="clientPhone" value="${esc(x.phone||'')}"></label><button id="${c?'saveClientEdit':'saveClientCreate'}" ${c?`data-id="${c.id}"`:''} class="primary span3">${c?'Enregistrer':'Créer le client'}</button></div>`}
+function establishmentForm(e=null,forcedClientId=null){
+  const x=e||{},clientId=Number(x.clientId||forcedClientId||state.clients[0]?.id||0);
+  return `<div class="form-grid"><label class="span2">Établissement<input id="estName" value="${esc(x.name||'')}" placeholder="Ex. Brasserie Centrale"></label><label>Client<select id="estClient">${state.clients.filter(c=>c.active!==false).map(c=>`<option value="${c.id}" ${Number(c.id)===clientId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label><label>Formule<select id="estPlan"><option value="basic" ${x.plan==='basic'?'selected':''}>Basic</option><option value="pro" ${x.plan==='pro'||!x.plan?'selected':''}>Pro</option><option value="multi" ${x.plan==='multi'?'selected':''}>Multi-sites</option></select></label><label>Licence<select id="estLicenseStatus"><option value="active" ${x.licenseStatus==='active'||!x.licenseStatus?'selected':''}>Active</option><option value="suspended" ${x.licenseStatus==='suspended'?'selected':''}>Suspendue</option><option value="expired" ${x.licenseStatus==='expired'?'selected':''}>Expirée</option></select></label><label>Fin de licence<input id="estLicenseEnd" type="date" value="${esc(x.licenseEnd||'')}"></label><label class="span2">Adresse<input id="estAddress" value="${esc(x.address||'')}"></label><label>Téléphone<input id="estPhone" value="${esc(x.phone||'')}"></label><label>Email<input id="estEmail" type="email" value="${esc(x.email||'')}"></label><button id="${e?'saveEstablishmentEdit':'saveEstablishmentCreate'}" ${e?`data-id="${e.id}"`:''} class="primary span3">${e?'Enregistrer':'Créer l’établissement'}</button></div>`
+}
+function renderSuperAdmin(){
+  if(!isSuperAdmin())return;const clients=state.clients||[],ests=state.establishments||[];
+  const active=ests.filter(e=>licenseEffectiveStatus(e)==='active').length,suspended=ests.length-active,totalRevenue=ests.reduce((sum,e)=>sum+establishmentSalesTotal(e.id),0);
+  qs('#saStats').innerHTML=`<div><b>${clients.filter(c=>c.active!==false).length}</b><span>clients</span></div><div><b>${ests.length}</b><span>établissements</span></div><div><b>${active}</b><span>licences actives</span></div><div><b>${money(totalRevenue)}</b><span>CA total démo</span></div>`;
+  qs('#clientsAdminList').innerHTML=clients.map(c=>{const ce=ests.filter(e=>Number(e.clientId)===Number(c.id)),clientRevenue=ce.reduce((sum,e)=>sum+establishmentSalesTotal(e.id),0);return `<div class="sa-client-card ${c.active===false?'inactive':''}"><div class="sa-client-head"><div><h3>${esc(c.name)}</h3><div class="muted">${esc(c.companyName||'')} ${c.vatNumber?'· '+esc(c.vatNumber):''} · CA ${money(clientRevenue)}</div></div><div class="personnel-actions"><button class="secondary editClient" data-id="${c.id}">Modifier</button><button class="primary addEstablishmentForClient" data-id="${c.id}">+ Établissement</button></div></div><div class="sa-est-grid">${ce.map(e=>{const st=licenseEffectiveStatus(e),sales=establishmentSalesTotal(e.id);return `<div class="sa-est-card"><div><b>${esc(e.name)}</b><div class="muted">${planLabel(e.plan)} · ${esc(e.address||'Adresse non renseignée')}</div><div class="muted">CA démo : <b>${money(sales)}</b>${e.licenseEnd?` · fin ${esc(e.licenseEnd)}`:''}</div></div><span class="status-pill ${st==='active'?'on':'off'}">${st==='active'?'Active':st==='expired'?'Expirée':'Suspendue'}</span><div class="sa-est-actions"><button class="secondary openEstablishment" data-id="${e.id}">Ouvrir</button><button class="secondary editEstablishment" data-id="${e.id}">Modifier</button><button class="${st==='active'?'dangerbtn':'primary'} toggleEstablishmentLicense" data-id="${e.id}">${st==='active'?'Suspendre':'Activer'}</button></div></div>`}).join('')||'<div class="empty">Aucun établissement</div>'}</div></div>`}).join('')||'<div class="empty">Aucun client</div>';
+}
 
 function renderSettings(){
   qs('#generalEstablishmentName').value=state.settings.establishmentName;
   renderPersonnel();renderRoomSettings();
 }
-qs('#saveGeneralSettingsBtn').onclick=()=>{state.settings.establishmentName=qs('#generalEstablishmentName').value.trim()||'Restaurant Pro';save();toast('Paramètres enregistrés')};
+qs('#saveGeneralSettingsBtn').onclick=()=>{const name=qs('#generalEstablishmentName').value.trim()||'Restaurant Pro';updateCurrentEstablishmentName(name);save();renderEstablishmentSwitcher();toast('Paramètres enregistrés')};
 qs('#addPersonnelBtn').onclick=()=>modal('Ajouter un utilisateur',personnelForm());
 qs('#autoLockMinutes').onchange=e=>{state.settings.autoLockMinutes=Number(e.target.value||0);save();scheduleAutoLock();toast(state.settings.autoLockMinutes?'Verrouillage automatique activé':'Verrouillage automatique désactivé')};
 qs('#settingsRoomSelect').onchange=e=>{state.settingsRoomId=Number(e.target.value);save();renderRoomSettings()};
@@ -793,6 +901,26 @@ qs('#addTableBtn').onclick=()=>modal('Ajouter une table',tableSettingsForm());
 document.addEventListener('click',e=>{
   if(e.target.id==='modalClose')closeModal();
 
+  // ===== v2.25 : Super Admin, clients, établissements et licences =====
+  if(e.target.id==='addClientBtn'){if(!isSuperAdmin())return toast('Accès Super Admin requis');modal('Nouveau client',clientForm())}
+  if(e.target.id==='saveClientCreate'||e.target.id==='saveClientEdit'){
+    if(!isSuperAdmin())return toast('Accès Super Admin requis');const editing=e.target.id==='saveClientEdit',id=Number(e.target.dataset.id||0),name=qs('#clientName')?.value.trim();if(!name)return toast('Nom client obligatoire');
+    const data={name,companyName:qs('#clientCompany')?.value.trim(),vatNumber:qs('#clientVat')?.value.trim(),email:qs('#clientEmail')?.value.trim(),phone:qs('#clientPhone')?.value.trim(),active:true};
+    if(editing){const c=clientById(id);if(c)Object.assign(c,data)}else state.clients.push({id:state.nextClientId++,...data});save();closeModal();renderSuperAdmin();toast(editing?'Client modifié':'Client créé');
+  }
+  if(e.target.classList.contains('editClient')){const c=clientById(Number(e.target.dataset.id));if(c)modal('Modifier le client',clientForm(c))}
+  if(e.target.id==='saveEstablishmentCreate'||e.target.id==='saveEstablishmentEdit'){
+    if(!isSuperAdmin())return toast('Accès Super Admin requis');const editing=e.target.id==='saveEstablishmentEdit',id=Number(e.target.dataset.id||0),name=qs('#estName')?.value.trim();if(!name)return toast('Nom établissement obligatoire');
+    const data={name,clientId:Number(qs('#estClient')?.value),plan:qs('#estPlan')?.value||'pro',licenseStatus:qs('#estLicenseStatus')?.value||'active',licenseEnd:qs('#estLicenseEnd')?.value||'',address:qs('#estAddress')?.value.trim(),phone:qs('#estPhone')?.value.trim(),email:qs('#estEmail')?.value.trim(),active:true};
+    if(editing){const est=state.establishments.find(v=>Number(v.id)===id);if(est){Object.assign(est,data);if(state.establishmentData[String(id)]?.settings)state.establishmentData[String(id)].settings.establishmentName=name;if(Number(state.currentEstablishmentId)===id)state.settings.establishmentName=name}}
+    else{const est={id:state.nextEstablishmentId++,...data};state.establishments.push(est);state.establishmentData[String(est.id)]=freshEstablishmentData(name)}
+    save();closeModal();renderEstablishmentSwitcher();renderSuperAdmin();toast(editing?'Établissement modifié':'Établissement créé');
+  }
+  if(e.target.classList.contains('addEstablishmentForClient'))modal('Nouvel établissement',establishmentForm(null,Number(e.target.dataset.id)));
+  if(e.target.classList.contains('editEstablishment')){const est=state.establishments.find(v=>Number(v.id)===Number(e.target.dataset.id));if(est)modal('Modifier l’établissement',establishmentForm(est))}
+  if(e.target.classList.contains('openEstablishment')){switchEstablishment(Number(e.target.dataset.id));setPage('pos')}
+  if(e.target.classList.contains('toggleEstablishmentLicense')){const est=state.establishments.find(v=>Number(v.id)===Number(e.target.dataset.id));if(est){const active=licenseEffectiveStatus(est)==='active';est.licenseStatus=active?'suspended':'active';if(!active&&est.licenseEnd&&est.licenseEnd<localDateISO())est.licenseEnd='';save();renderEstablishmentSwitcher();renderSuperAdmin();toast(active?'Licence suspendue':'Licence activée')}}
+
   // ===== v2.24 : personnel, PIN et rôles =====
   if(e.target.id==='savePersonnelCreate'||e.target.id==='savePersonnelEdit'){
     if(!isAdmin())return toast('Accès administrateur requis');
@@ -800,14 +928,17 @@ document.addEventListener('click',e=>{
     if(!name||!username)return toast('Nom et identifiant obligatoires');
     if(!/^[a-z0-9._-]{2,30}$/.test(username))return toast('Identifiant : lettres, chiffres, point, tiret ou _');
     if(!['server','manager','admin'].includes(role))return toast('Rôle invalide');
+    const establishmentIds=qsa('.personEstablishmentAccess:checked').map(x=>Number(x.value));if(!establishmentIds.length)return toast('Choisissez au moins un établissement');
+    const clientId=Number(currentEstablishment()?.clientId||0);
+    if(editing&&Number(state.user?.id)===id&&!establishmentIds.includes(Number(state.currentEstablishmentId)))return toast('Gardez l’accès à l’établissement actuellement ouvert');
     if(state.users.some(u=>normalizeLogin(u.username)===username&&(!editing||Number(u.id)!==id)))return toast('Cet identifiant existe déjà');
     if(!editing&&pin.length<4)return toast('PIN minimum 4 caractères');
     if(editing){
       const u=state.users.find(v=>Number(v.id)===id);if(!u)return;
       if(u.role==='admin'&&role!=='admin'&&u.active!==false&&countActiveAdmins(id)<1)return toast('Il faut conserver au moins un administrateur actif');
-      Object.assign(u,{name,username,role});if(pin){if(pin.length<4)return toast('PIN minimum 4 caractères');u.pin=pin}
+      Object.assign(u,{name,username,role,clientId,establishmentIds});if(pin){if(pin.length<4)return toast('PIN minimum 4 caractères');u.pin=pin}
       if(Number(state.user?.id)===id)state.user=userSnapshot(u);
-    }else state.users.push({id:state.nextUserId++,name,username,role,pin,active:true});
+    }else state.users.push({id:state.nextUserId++,name,username,role,pin,active:true,clientId,establishmentIds});
     save();closeModal();renderPersonnel();applyRole();qs('#userBadge').textContent=`${state.user.name} · ${roleLabel(state.user.role)}`;toast(editing?'Utilisateur modifié':'Utilisateur créé');
   }
   if(e.target.classList.contains('editPersonnel')){const u=state.users.find(v=>Number(v.id)===Number(e.target.dataset.id));if(u)modal('Modifier utilisateur',personnelForm(u))}
@@ -871,7 +1002,7 @@ document.addEventListener('click',e=>{
   if(e.target.id==='saveResEdit'){const id=Number(e.target.dataset.id),r=state.reservations.find(x=>x.id===id);const x=readResForm(r?.status||'booked'),err=validateReservation(x,id);if(err)return toast(err);Object.assign(r,x);state.reservationDate=x.date;save();closeModal();renderReservations();renderTables();toast('Réservation modifiée')}
   if(e.target.classList.contains('resCancel')){const r=state.reservations.find(x=>x.id===Number(e.target.dataset.id));if(r){r.status='cancelled';save();renderReservations();renderTables();toast('Réservation annulée')}}
   if(e.target.classList.contains('resArrive')){const r=state.reservations.find(x=>x.id===Number(e.target.dataset.id));if(r){r.status='arrived';save();renderReservations();renderTables();if(r.tableId){setPage('pos');selectTable(state.tables.find(t=>t.id===r.tableId));toast('Table ouverte pour le client')}else toast('Client arrivé — attribuez une table')}}
-  if(e.target.id==='saveResSettings'){Object.assign(state.settings,{establishmentName:qs('#sName').value.trim()||'Restaurant Pro',maxReservationsPerDay:Number(qs('#sMaxRes').value),maxCoversPerDay:Number(qs('#sMaxCovers').value),maxPartySize:Number(qs('#sMaxParty').value),minLeadMinutes:Number(qs('#sLead').value),maxAdvanceDays:Number(qs('#sAdvance').value),slotIntervalMinutes:Number(qs('#sSlot').value),defaultDurationMinutes:Number(qs('#sDuration').value),lunchEnabled:qs('#sLunchOn').value==='1',lunchStart:qs('#sLunchStart').value,lunchEnd:qs('#sLunchEnd').value,dinnerEnabled:qs('#sDinnerOn').value==='1',dinnerStart:qs('#sDinnerStart').value,dinnerEnd:qs('#sDinnerEnd').value,phoneRequired:qs('#sPhone').value==='1',allowUnassignedTable:qs('#sUnassigned').value==='1',staffCanOverrideLimits:qs('#sOverride').value==='1'});save();closeModal();renderReservations();toast('Paramètres enregistrés')}
+  if(e.target.id==='saveResSettings'){Object.assign(state.settings,{establishmentName:qs('#sName').value.trim()||'Restaurant Pro',maxReservationsPerDay:Number(qs('#sMaxRes').value),maxCoversPerDay:Number(qs('#sMaxCovers').value),maxPartySize:Number(qs('#sMaxParty').value),minLeadMinutes:Number(qs('#sLead').value),maxAdvanceDays:Number(qs('#sAdvance').value),slotIntervalMinutes:Number(qs('#sSlot').value),defaultDurationMinutes:Number(qs('#sDuration').value),lunchEnabled:qs('#sLunchOn').value==='1',lunchStart:qs('#sLunchStart').value,lunchEnd:qs('#sLunchEnd').value,dinnerEnabled:qs('#sDinnerOn').value==='1',dinnerStart:qs('#sDinnerStart').value,dinnerEnd:qs('#sDinnerEnd').value,phoneRequired:qs('#sPhone').value==='1',allowUnassignedTable:qs('#sUnassigned').value==='1',staffCanOverrideLimits:qs('#sOverride').value==='1'});updateCurrentEstablishmentName(state.settings.establishmentName);save();renderEstablishmentSwitcher();closeModal();renderReservations();toast('Paramètres enregistrés')}
   if(e.target.id==='saveProduct'){const p={id:state.nextProductId++,name:qs('#pName').value.trim(),cat:qs('#pCat').value,price:Number(qs('#pPrice').value),vat:Number(qs('#pVat').value),station:qs('#pStation').value,askCooking:qs('#pAskCooking')?.value==='1',askSauce:qs('#pAskSauce')?.value==='1',accompanimentGroupId:qs('#pAccompanimentGroup')?.value?Number(qs('#pAccompanimentGroup').value):null,allowKitchenMessage:qs('#pAllowKitchenMessage')?.value!=='0',stock:Number(qs('#pStock').value),low:Number(qs('#pLow').value)};state.products.push(p);save();closeModal();renderProductsAdmin();renderCategories();renderProducts();toast('Produit créé')}
   if(e.target.classList.contains('editProduct')){const p=state.products.find(x=>x.id===Number(e.target.dataset.id));if(p)modal('Modifier produit',productForm(p))}
   if(e.target.id==='saveProductEdit'){const p=state.products.find(x=>x.id===Number(e.target.dataset.id));Object.assign(p,{name:qs('#pName').value.trim(),cat:qs('#pCat').value,price:Number(qs('#pPrice').value),vat:Number(qs('#pVat').value),station:qs('#pStation').value,askCooking:qs('#pAskCooking')?.value==='1',askSauce:qs('#pAskSauce')?.value==='1',accompanimentGroupId:qs('#pAccompanimentGroup')?.value?Number(qs('#pAccompanimentGroup').value):null,allowKitchenMessage:qs('#pAllowKitchenMessage')?.value!=='0',stock:Number(qs('#pStock').value),low:Number(qs('#pLow').value)});save();closeModal();renderProductsAdmin();renderCategories();renderProducts();toast('Produit modifié')}
@@ -931,8 +1062,14 @@ document.addEventListener('click',e=>{
 });
 qs('#modal').onclick=e=>{if(e.target.id==='modal')closeModal()};
 
-function renderAll(){renderCash();renderTables();renderContext();renderCategories();renderProducts();renderCart();renderReservations()}
+function renderAll(){renderEstablishmentSwitcher();renderCash();renderTables();renderContext();renderCategories();renderProducts();renderCart();renderReservations()}
 load();
+normalizeOperationalData();
+if(state.user){
+  const allowed=accessibleEstablishments(state.user);let target=currentEstablishment();
+  if(!target||!userCanUseEstablishment(state.user,target)||(state.user.role!=='superadmin'&&!isEstablishmentLicensed(target)))target=state.user.role==='superadmin'?allowed[0]:allowed.find(isEstablishmentLicensed);
+  if(target){state.currentEstablishmentId=Number(target.id);applyEstablishmentData(target.id);normalizeOperationalData()}else state.user=null;
+}
 state.cart=consolidateCart(state.cart||[]);
 Object.keys(state.openOrders||{}).forEach(k=>{
   if(state.openOrders[k]?.items)state.openOrders[k].items=consolidateCart(state.openOrders[k].items);
