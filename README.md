@@ -1,3 +1,20 @@
+# Restaurant Pro v2.29 — Compte administrateur par établissement
+
+## Nouveautés v2.29
+
+- Chaque nouvel établissement reçoit désormais son **propre compte administrateur principal**.
+- À la création d’un établissement, le Super Admin doit saisir : **e-mail administrateur + PIN initial**.
+- Connexion du restaurant avec **e-mail + PIN**.
+- Le compte administrateur principal est automatiquement affecté à l’établissement.
+- Pour un établissement déjà existant, **Modifier** permet d’associer/configurer l’administrateur et de définir un nouveau PIN.
+- Le PIN doit contenir **4 à 8 chiffres**.
+- Le PIN n’est plus affiché après l’enregistrement ; le Super Admin peut le réinitialiser en modifiant l’établissement.
+- Les autres administrateurs, responsables et serveurs peuvent toujours être autorisés séparément.
+
+> La récupération automatique par e-mail nécessitera toujours la future version serveur (Render + PostgreSQL).
+
+---
+
 # Restaurant Pro v2.28 — Accès établissements, e-mail et changement de PIN
 
 ## Nouveautés v2.28

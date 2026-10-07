@@ -7,7 +7,7 @@ let inactivityTimer=null,appLocked=false;
 let pendingProductConfig=null;
 
 const defaults={
-  user:null,migrationV228AccessDone:false,
+  user:null,migrationV228AccessDone:false,migrationV229PrimaryAdminDone:false,
   users:[
     {id:1,username:'admin',name:'Administrateur',email:'',pin:'3333',role:'admin',active:true,clientId:1,establishmentIds:[1]},
     {id:2,username:'manager',name:'Responsable',email:'',pin:'2222',role:'manager',active:true,clientId:1,establishmentIds:[1]},
@@ -15,7 +15,7 @@ const defaults={
     {id:4,username:'superadmin',name:'Super Admin Restaurant Pro',email:'',pin:'9999',role:'superadmin',active:true,clientId:null,establishmentIds:[]}
   ],nextUserId:5,
   clients:[{id:1,name:'Client démo',companyName:'Restaurant Pro Démo',vatNumber:'',email:'',phone:'',active:true}],nextClientId:2,
-  establishments:[{id:1,clientId:1,name:'Restaurant Pro',address:'',phone:'',email:'',plan:'pro',licenseStatus:'active',licenseEnd:'',active:true}],nextEstablishmentId:2,currentEstablishmentId:1,establishmentData:{},
+  establishments:[{id:1,clientId:1,name:'Restaurant Pro',address:'',phone:'',email:'',primaryAdminUserId:1,plan:'pro',licenseStatus:'active',licenseEnd:'',active:true}],nextEstablishmentId:2,currentEstablishmentId:1,establishmentData:{},
   cashOpen:false,cashOpening:0,currentMode:'table',tableId:null,category:'Plats',sent:false,dirty:false,payment:'card',
   rooms:[{id:1,name:'Salle principale'}],nextRoomId:2,nextTableId:11,posRoomId:1,settingsRoomId:1,
   tables:[
@@ -168,6 +168,8 @@ function load(){
     state.establishments=state.establishments.map(e=>({...e,email:String(e.email||'').trim().toLowerCase()}));
     // v2.28 — correction unique des anciennes données : un admin du client récupère les établissements déjà créés.
     if(!state.migrationV228AccessDone){state.users.forEach(u=>{if(u.role!=='admin'||u.active===false)return;const ids=state.establishments.filter(e=>Number(e.clientId)===Number(u.clientId)&&e.active!==false).map(e=>Number(e.id));u.establishmentIds=[...new Set([...(u.establishmentIds||[]).map(Number),...ids])]});state.migrationV228AccessDone=true}
+    // v2.29 — chaque établissement référence un administrateur principal existant lorsqu'il y en a un.
+    if(!state.migrationV229PrimaryAdminDone){state.establishments.forEach(est=>{if(est.primaryAdminUserId)return;const admin=state.users.find(u=>u.active!==false&&u.role==='admin'&&Number(u.clientId)===Number(est.clientId)&&(u.establishmentIds||[]).map(Number).includes(Number(est.id)));if(admin)est.primaryAdminUserId=Number(admin.id)});state.migrationV229PrimaryAdminDone=true}
     state.nextClientId=Math.max(Number(state.nextClientId||0)-1,...state.clients.map(v=>Number(v.id)||0),0)+1;
     state.nextEstablishmentId=Math.max(Number(state.nextEstablishmentId||0)-1,...state.establishments.map(v=>Number(v.id)||0),0)+1;
     state.currentEstablishmentId=Number(state.currentEstablishmentId||state.establishments[0]?.id||1);
@@ -229,6 +231,9 @@ function canAccessPage(name){
 }
 function currentAccount(){return state.users.find(u=>u.active!==false&&(Number(u.id)===Number(state.user?.id)||u.username===state.user?.username))||null}
 function normalizeLogin(v){return String(v||'').trim().toLowerCase()}
+function usernameBase(v){return String(v||'restaurant').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'.').replace(/^\.|\.$/g,'').slice(0,24)||'restaurant'}
+function uniqueUsername(base,exceptId=null){let candidate=usernameBase(base),n=1;while(state.users.some(u=>normalizeLogin(u.username)===candidate&&Number(u.id)!==Number(exceptId))){n++;candidate=`${usernameBase(base).slice(0,Math.max(1,27-String(n).length))}${n}`}return candidate}
+function primaryAdminForEstablishment(est){if(!est)return null;const byId=state.users.find(u=>Number(u.id)===Number(est.primaryAdminUserId)&&u.role==='admin');if(byId)return byId;return state.users.find(u=>u.active!==false&&u.role==='admin'&&Number(u.clientId)===Number(est.clientId)&&Array.isArray(u.establishmentIds)&&u.establishmentIds.map(Number).includes(Number(est.id)))||null}
 function findLoginAccount(value){const v=normalizeLogin(value);return state.users.find(u=>u.active!==false&&(normalizeLogin(u.username)===v||normalizeLogin(u.name)===v||normalizeLogin(u.email)===v))||null}
 function validEmail(v){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v||'').trim())}
 function maskEmail(v){const email=String(v||'').trim();const [a,b]=email.split('@');if(!a||!b)return email;return `${a.slice(0,2)}${'*'.repeat(Math.max(2,a.length-2))}@${b}`}
@@ -955,15 +960,16 @@ function establishmentAccessHtml(clientId,estId=null){
 }
 function refreshEstablishmentAccessPicker(clientId,estId=null){const box=qs('#estAccessUsers');if(box)box.innerHTML=establishmentAccessHtml(Number(clientId),estId)}
 function establishmentForm(e=null,forcedClientId=null){
-  const x=e||{},clientId=Number(x.clientId||forcedClientId||state.clients[0]?.id||0);
-  return `<div class="form-grid"><label class="span2">Établissement<input id="estName" value="${esc(x.name||'')}" placeholder="Ex. Brasserie Centrale"></label><label>Client<select id="estClient" data-edit-est-id="${e?e.id:''}">${state.clients.filter(c=>c.active!==false).map(c=>`<option value="${c.id}" ${Number(c.id)===clientId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label><label>Formule<select id="estPlan"><option value="basic" ${x.plan==='basic'?'selected':''}>Basic</option><option value="pro" ${x.plan==='pro'||!x.plan?'selected':''}>Pro</option><option value="multi" ${x.plan==='multi'?'selected':''}>Multi-sites</option></select></label><label>Licence<select id="estLicenseStatus"><option value="active" ${x.licenseStatus==='active'||!x.licenseStatus?'selected':''}>Active</option><option value="suspended" ${x.licenseStatus==='suspended'?'selected':''}>Suspendue</option><option value="expired" ${x.licenseStatus==='expired'?'selected':''}>Expirée</option></select></label><label>Fin de licence<input id="estLicenseEnd" type="date" value="${esc(x.licenseEnd||'')}"></label><label class="span2">Adresse<input id="estAddress" value="${esc(x.address||'')}"></label><label>Téléphone<input id="estPhone" value="${esc(x.phone||'')}"></label><label class="span2">E-mail établissement / récupération PIN<input id="estEmail" type="email" value="${esc(x.email||'')}" placeholder="direction@restaurant.be"></label><div class="span3 establishment-access-box"><div class="access-box-title"><b>Personnel autorisé dans cet établissement</b><span class="muted">Les administrateurs du client sont cochés automatiquement lors de la création.</span></div><div id="estAccessUsers">${establishmentAccessHtml(clientId,e?.id||null)}</div></div><button id="${e?'saveEstablishmentEdit':'saveEstablishmentCreate'}" ${e?`data-id="${e.id}"`:''} class="primary span3">${e?'Enregistrer':'Créer l’établissement'}</button></div>`;
+  const x=e||{},clientId=Number(x.clientId||forcedClientId||state.clients[0]?.id||0),admin=e?primaryAdminForEstablishment(e):null;
+  const adminName=admin?.name||`Administrateur ${x.name||''}`.trim(),adminEmail=admin?.email||x.email||'';
+  return `<div class="form-grid"><label class="span2">Établissement<input id="estName" value="${esc(x.name||'')}" placeholder="Ex. Brasserie Centrale"></label><label>Client<select id="estClient" data-edit-est-id="${e?e.id:''}">${state.clients.filter(c=>c.active!==false).map(c=>`<option value="${c.id}" ${Number(c.id)===clientId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label><label>Formule<select id="estPlan"><option value="basic" ${x.plan==='basic'?'selected':''}>Basic</option><option value="pro" ${x.plan==='pro'||!x.plan?'selected':''}>Pro</option><option value="multi" ${x.plan==='multi'?'selected':''}>Multi-sites</option></select></label><label>Licence<select id="estLicenseStatus"><option value="active" ${x.licenseStatus==='active'||!x.licenseStatus?'selected':''}>Active</option><option value="suspended" ${x.licenseStatus==='suspended'?'selected':''}>Suspendue</option><option value="expired" ${x.licenseStatus==='expired'?'selected':''}>Expirée</option></select></label><label>Fin de licence<input id="estLicenseEnd" type="date" value="${esc(x.licenseEnd||'')}"></label><label class="span2">Adresse<input id="estAddress" value="${esc(x.address||'')}"></label><label>Téléphone<input id="estPhone" value="${esc(x.phone||'')}"></label><label class="span2">E-mail établissement / récupération<input id="estEmail" type="email" value="${esc(x.email||'')}" placeholder="direction@restaurant.be"></label><div class="span3 establishment-access-box"><div class="access-box-title"><b>Compte administrateur principal de l’établissement</b><span class="muted">Connexion avec cet e-mail + PIN.</span></div><div class="form-grid"><label class="span2">Nom administrateur<input id="estAdminName" value="${esc(adminName)}" placeholder="Ex. Direction Au Point de Vue"></label><label class="span2">E-mail de connexion<input id="estAdminEmail" type="email" value="${esc(adminEmail)}" placeholder="direction@restaurant.be"></label><label class="span2">${admin?'Nouveau PIN administrateur (laisser vide pour garder le PIN actuel)':'PIN initial administrateur'}<input id="estAdminPin" type="password" inputmode="numeric" autocomplete="new-password" placeholder="4 à 8 chiffres"></label>${admin?`<div class="span3 muted">Compte actuel : <b>${esc(admin.username)}</b> · ${esc(admin.email||'sans e-mail')}</div>`:''}</div></div><div class="span3 establishment-access-box"><div class="access-box-title"><b>Autre personnel autorisé dans cet établissement</b><span class="muted">Le compte administrateur principal aura toujours accès.</span></div><div id="estAccessUsers">${establishmentAccessHtml(clientId,e?.id||null)}</div></div><button id="${e?'saveEstablishmentEdit':'saveEstablishmentCreate'}" ${e?`data-id="${e.id}"`:''} class="primary span3">${e?'Enregistrer':'Créer l’établissement'}</button></div>`;
 }
 
 function renderSuperAdmin(){
   if(!isSuperAdmin())return;const clients=state.clients||[],ests=state.establishments||[];
   const active=ests.filter(e=>licenseEffectiveStatus(e)==='active').length,suspended=ests.length-active,totalRevenue=ests.reduce((sum,e)=>sum+establishmentSalesTotal(e.id),0);
   qs('#saStats').innerHTML=`<div><b>${clients.filter(c=>c.active!==false).length}</b><span>clients</span></div><div><b>${ests.length}</b><span>établissements</span></div><div><b>${active}</b><span>licences actives</span></div><div><b>${money(totalRevenue)}</b><span>CA total démo</span></div>`;
-  qs('#clientsAdminList').innerHTML=clients.map(c=>{const ce=ests.filter(e=>Number(e.clientId)===Number(c.id)),clientRevenue=ce.reduce((sum,e)=>sum+establishmentSalesTotal(e.id),0);return `<div class="sa-client-card ${c.active===false?'inactive':''}"><div class="sa-client-head"><div><h3>${esc(c.name)}</h3><div class="muted">${esc(c.companyName||'')} ${c.vatNumber?'· '+esc(c.vatNumber):''} · CA ${money(clientRevenue)}</div></div><div class="personnel-actions"><button class="secondary editClient" data-id="${c.id}">Modifier</button><button class="primary addEstablishmentForClient" data-id="${c.id}">+ Établissement</button></div></div><div class="sa-est-grid">${ce.map(e=>{const st=licenseEffectiveStatus(e),sales=establishmentSalesTotal(e.id);return `<div class="sa-est-card"><div><b>${esc(e.name)}</b><div class="muted">${planLabel(e.plan)} · ${esc(e.address||'Adresse non renseignée')}${e.email?' · '+esc(e.email):''}</div><div class="muted">CA démo : <b>${money(sales)}</b>${e.licenseEnd?` · fin ${esc(e.licenseEnd)}`:''}</div></div><span class="status-pill ${st==='active'?'on':'off'}">${st==='active'?'Active':st==='expired'?'Expirée':'Suspendue'}</span><div class="sa-est-actions"><button class="secondary openEstablishment" data-id="${e.id}">Ouvrir</button><button class="secondary editEstablishment" data-id="${e.id}">Modifier</button><button class="${st==='active'?'dangerbtn':'primary'} toggleEstablishmentLicense" data-id="${e.id}">${st==='active'?'Suspendre':'Activer'}</button></div></div>`}).join('')||'<div class="empty">Aucun établissement</div>'}</div></div>`}).join('')||'<div class="empty">Aucun client</div>';
+  qs('#clientsAdminList').innerHTML=clients.map(c=>{const ce=ests.filter(e=>Number(e.clientId)===Number(c.id)),clientRevenue=ce.reduce((sum,e)=>sum+establishmentSalesTotal(e.id),0);return `<div class="sa-client-card ${c.active===false?'inactive':''}"><div class="sa-client-head"><div><h3>${esc(c.name)}</h3><div class="muted">${esc(c.companyName||'')} ${c.vatNumber?'· '+esc(c.vatNumber):''} · CA ${money(clientRevenue)}</div></div><div class="personnel-actions"><button class="secondary editClient" data-id="${c.id}">Modifier</button><button class="primary addEstablishmentForClient" data-id="${c.id}">+ Établissement</button></div></div><div class="sa-est-grid">${ce.map(e=>{const st=licenseEffectiveStatus(e),sales=establishmentSalesTotal(e.id);return `<div class="sa-est-card"><div><b>${esc(e.name)}</b><div class="muted">${planLabel(e.plan)} · ${esc(e.address||'Adresse non renseignée')}${e.email?' · '+esc(e.email):''}</div><div class="muted">Admin : ${esc(primaryAdminForEstablishment(e)?.email||primaryAdminForEstablishment(e)?.username||'à configurer')}</div><div class="muted">CA démo : <b>${money(sales)}</b>${e.licenseEnd?` · fin ${esc(e.licenseEnd)}`:''}</div></div><span class="status-pill ${st==='active'?'on':'off'}">${st==='active'?'Active':st==='expired'?'Expirée':'Suspendue'}</span><div class="sa-est-actions"><button class="secondary openEstablishment" data-id="${e.id}">Ouvrir</button><button class="secondary editEstablishment" data-id="${e.id}">Modifier</button><button class="${st==='active'?'dangerbtn':'primary'} toggleEstablishmentLicense" data-id="${e.id}">${st==='active'?'Suspendre':'Activer'}</button></div></div>`}).join('')||'<div class="empty">Aucun établissement</div>'}</div></div>`}).join('')||'<div class="empty">Aucun client</div>';
 }
 
 function renderSettings(){
@@ -1005,28 +1011,37 @@ document.addEventListener('click',e=>{
   if(e.target.id==='saveEstablishmentCreate'||e.target.id==='saveEstablishmentEdit'){
     if(!isSuperAdmin())return toast('Accès Super Admin requis');
     const editing=e.target.id==='saveEstablishmentEdit',id=Number(e.target.dataset.id||0),name=qs('#estName')?.value.trim();if(!name)return toast('Nom établissement obligatoire');
-    const clientId=Number(qs('#estClient')?.value),email=normalizeLogin(qs('#estEmail')?.value);
+    const clientId=Number(qs('#estClient')?.value),email=normalizeLogin(qs('#estEmail')?.value),adminName=qs('#estAdminName')?.value.trim()||`Administrateur ${name}`,adminEmail=normalizeLogin(qs('#estAdminEmail')?.value||email),adminPin=String(qs('#estAdminPin')?.value||'').trim();
     if(!validEmail(email))return toast('E-mail de l’établissement obligatoire et valide');
+    if(!validEmail(adminEmail))return toast('E-mail administrateur obligatoire et valide');
+    if(adminPin&&!/^\d{4,8}$/.test(adminPin))return toast('PIN administrateur : 4 à 8 chiffres');
     const data={name,clientId,plan:qs('#estPlan')?.value||'pro',licenseStatus:qs('#estLicenseStatus')?.value||'active',licenseEnd:qs('#estLicenseEnd')?.value||'',address:qs('#estAddress')?.value.trim(),phone:qs('#estPhone')?.value.trim(),email,active:true};
-    let estId=id,oldClientId=null;
-    if(editing){const est=state.establishments.find(v=>Number(v.id)===id);if(est){oldClientId=Number(est.clientId);Object.assign(est,data);if(state.establishmentData[String(id)]?.settings)state.establishmentData[String(id)].settings.establishmentName=name;if(Number(state.currentEstablishmentId)===id)state.settings.establishmentName=name}}
-    else{const est={id:state.nextEstablishmentId++,...data};estId=est.id;state.establishments.push(est);state.establishmentData[String(est.id)]=freshEstablishmentData(name)}
-    const selectedIds=new Set(qsa('.establishmentUserAccess:checked').map(x=>Number(x.value)));
-    // Si aucun utilisateur n’a été coché à la création, les administrateurs actifs du client reçoivent automatiquement l’accès.
-    if(!editing&&selectedIds.size===0)state.users.filter(u=>u.active!==false&&u.role==='admin'&&Number(u.clientId)===clientId).forEach(u=>selectedIds.add(Number(u.id)));
+    let estId=id,oldClientId=null,est=editing?state.establishments.find(v=>Number(v.id)===id):null,primaryAdmin=est?primaryAdminForEstablishment(est):null;
+    if(!editing&&!adminPin)return toast('Choisissez un PIN initial pour l’administrateur');
+    if(editing&&!primaryAdmin&&!adminPin)return toast('Cet établissement n’a pas encore de compte administrateur : choisissez un PIN');
+    const emailOwner=state.users.find(u=>normalizeLogin(u.email)===adminEmail&&(!primaryAdmin||Number(u.id)!==Number(primaryAdmin.id)));
+    if(emailOwner&&Number(emailOwner.clientId)!==clientId)return toast('Cet e-mail est déjà utilisé par un autre client');
+    if(emailOwner&&emailOwner.role!=='admin')return toast('Cet e-mail appartient déjà à un compte qui n’est pas administrateur');
+    if(editing){if(est){oldClientId=Number(est.clientId);Object.assign(est,data);if(state.establishmentData[String(id)]?.settings)state.establishmentData[String(id)].settings.establishmentName=name;if(Number(state.currentEstablishmentId)===id)state.settings.establishmentName=name}}
+    else{est={id:state.nextEstablishmentId++,...data};estId=est.id;state.establishments.push(est);state.establishmentData[String(est.id)]=freshEstablishmentData(name)}
+    if(emailOwner&&emailOwner.role==='admin'&&Number(emailOwner.clientId)===clientId){primaryAdmin=emailOwner}
+    if(!primaryAdmin){primaryAdmin={id:state.nextUserId++,name:adminName,username:uniqueUsername(name),email:adminEmail,pin:adminPin,role:'admin',active:true,clientId,establishmentIds:[Number(estId)]};state.users.push(primaryAdmin)}
+    else{
+      primaryAdmin.name=adminName;primaryAdmin.email=adminEmail;primaryAdmin.clientId=clientId;primaryAdmin.active=true;primaryAdmin.role='admin';primaryAdmin.establishmentIds=[...new Set([...(primaryAdmin.establishmentIds||[]).map(Number),Number(estId)])];if(adminPin)primaryAdmin.pin=adminPin;
+    }
+    est.primaryAdminUserId=Number(primaryAdmin.id);
+    const selectedIds=new Set(qsa('.establishmentUserAccess:checked').map(x=>Number(x.value)));selectedIds.add(Number(primaryAdmin.id));
+    if(!editing&&selectedIds.size===1)state.users.filter(u=>u.active!==false&&u.role==='admin'&&Number(u.clientId)===clientId).forEach(u=>selectedIds.add(Number(u.id)));
     state.users.forEach(u=>{
       if(u.role==='superadmin')return;
       u.establishmentIds=Array.isArray(u.establishmentIds)?u.establishmentIds.map(Number):[];
       if(editing&&oldClientId!=null&&Number(u.clientId)===oldClientId&&oldClientId!==clientId)u.establishmentIds=u.establishmentIds.filter(v=>Number(v)!==Number(estId));
       if(Number(u.clientId)!==clientId)return;
       if(selectedIds.has(Number(u.id)))u.establishmentIds=[...new Set([...u.establishmentIds,Number(estId)])];
-      else u.establishmentIds=u.establishmentIds.filter(v=>Number(v)!==Number(estId));
+      else if(Number(u.id)!==Number(primaryAdmin.id))u.establishmentIds=u.establishmentIds.filter(v=>Number(v)!==Number(estId));
     });
-    // Un administrateur actif du même client doit toujours pouvoir ouvrir l’établissement.
-    if(!state.users.some(u=>u.active!==false&&u.role==='admin'&&Number(u.clientId)===clientId&&(u.establishmentIds||[]).map(Number).includes(Number(estId)))){
-      const admin=state.users.find(u=>u.active!==false&&u.role==='admin'&&Number(u.clientId)===clientId);if(admin)admin.establishmentIds=[...new Set([...(admin.establishmentIds||[]).map(Number),Number(estId)])];
-    }
-    save();closeModal();renderEstablishmentSwitcher();renderSuperAdmin();toast(editing?'Établissement modifié':'Établissement créé et accès attribués');
+    save();closeModal();renderEstablishmentSwitcher();renderSuperAdmin();
+    modal(editing?'Établissement enregistré':'Établissement créé',`<div class="form-grid"><div class="span3"><b>${esc(name)}</b></div><div class="span3">Compte administrateur : <b>${esc(primaryAdmin.email||primaryAdmin.username)}</b></div><div class="span3 muted">Connexion : e-mail + PIN ${adminPin?'que vous venez de définir':'actuel'}. Le PIN n’est pas affiché après enregistrement.</div><button id="modalClose" class="primary span3">OK</button></div>`);
   }
   if(e.target.classList.contains('addEstablishmentForClient'))modal('Nouvel établissement',establishmentForm(null,Number(e.target.dataset.id)));
   if(e.target.classList.contains('editEstablishment')){const est=state.establishments.find(v=>Number(v.id)===Number(e.target.dataset.id));if(est)modal('Modifier l’établissement',establishmentForm(est))}
