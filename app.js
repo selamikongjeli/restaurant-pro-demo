@@ -377,13 +377,13 @@ qs('#floatingReservationsBtn').onclick=()=>setPage('reservations');
 
 function renderCash(){
   const b=qs('#cashBadge');b.textContent=state.cashOpen?'Caisse ouverte':'Caisse fermée';b.className='badge '+(state.cashOpen?'open':'closed');
-  qs('#openCashBtn').classList.toggle('hidden',state.cashOpen||!isManager());
+  qs('#openCashBtn').classList.toggle('hidden',state.cashOpen);
   qs('#closeCashBtn').classList.toggle('hidden',!state.cashOpen||!isManager());
   renderCart();
 }
 qs('#openCashBtn').onclick=()=>modal('Ouvrir la caisse',`<div class="form-grid"><label class="span3">Fond de caisse<input id="cashOpenAmount" type="number" step="0.01" value="100"></label><button id="confirmOpenCash" class="primary span3">Ouvrir</button></div>`);
-qs('#closeCashBtn').onclick=()=>modal('Fermer la caisse',cashCloseForm());
-qs('#closeDayBtn').onclick=()=>openDayClosureModal();
+qs('#closeCashBtn').onclick=()=>{if(!isManager())return toast('Fermeture de caisse réservée au responsable / administrateur');modal('Fermer la caisse',cashCloseForm())};
+qs('#closeDayBtn').onclick=()=>{if(!isManager())return toast('Clôture réservée au responsable / administrateur');openDayClosureModal()};
 
 function currentOpenCashSession(){return [...(state.cashSessions||[])].reverse().find(s=>!s.closedAt)||null}
 function cashSessionTotals(session=currentOpenCashSession()){
@@ -1178,8 +1178,9 @@ document.addEventListener('click',e=>{
     if(confirm(`Supprimer ${t.name} ?`)){state.tables=state.tables.filter(v=>Number(v.id)!==id);if(Number(state.tableId)===id){state.tableId=null;state.cart=[];state.sent=false;state.dirty=false}save();renderRoomSettings();renderTables();renderContext();renderCart();toast('Table supprimée')}
   }
   if(e.target.id==='confirmOpenCash'){const opening=Number(qs('#cashOpenAmount').value||0);state.cashOpen=true;state.cashOpening=opening;state.cashSessions=state.cashSessions||[];state.cashSessions.push({id:state.nextCashSessionId++,openedAt:new Date().toISOString(),openedBy:userSnapshot(state.user),opening,closedAt:null,countedClose:null,cashSales:0,cashExpenses:0,expectedClose:opening,difference:0});save();renderCash();closeModal();toast('Caisse ouverte')}
-  if(e.target.id==='confirmCloseCash'){const counted=Number(qs('#cashCloseAmount').value||0),session=currentOpenCashSession();if(session){const t=cashSessionTotals(session);Object.assign(session,{closedAt:new Date().toISOString(),closedBy:userSnapshot(state.user),countedClose:counted,cashSales:t.cashSales,cashExpenses:t.cashExpenses,expectedClose:t.expected,difference:counted-t.expected})}state.cashOpen=false;state.cashOpening=0;save();renderCash();closeModal();if(qs('#page-accounting')&&!qs('#page-accounting').classList.contains('hidden'))renderAccounting();toast('Caisse fermée')}
+  if(e.target.id==='confirmCloseCash'){if(!isManager())return toast('Fermeture de caisse réservée au responsable / administrateur');const counted=Number(qs('#cashCloseAmount').value||0),session=currentOpenCashSession();if(session){const t=cashSessionTotals(session);Object.assign(session,{closedAt:new Date().toISOString(),closedBy:userSnapshot(state.user),countedClose:counted,cashSales:t.cashSales,cashExpenses:t.cashExpenses,expectedClose:t.expected,difference:counted-t.expected})}state.cashOpen=false;state.cashOpening=0;save();renderCash();closeModal();if(qs('#page-accounting')&&!qs('#page-accounting').classList.contains('hidden'))renderAccounting();toast('Caisse fermée')}
   if(e.target.id==='confirmDayClose'){
+    if(!isManager())return toast('Clôture réservée au responsable / administrateur');
     if(Object.keys(state.openOrders||{}).length)return toast('Il reste des commandes ouvertes');
     const date=localDateISO();if((state.dayClosures||[]).some(c=>c.date===date))return toast('La journée est déjà clôturée');
     const x=dayClosurePreview(),counted=Number(qs('#dayCloseCounted')?.value||0),note=qs('#dayCloseNote')?.value.trim()||'',now=new Date().toISOString();

@@ -1,3 +1,17 @@
+# Restaurant Pro v2.31 — Ouverture caisse par serveur
+
+## Nouveautés v2.31
+
+- Le rôle **Serveur** peut maintenant **ouvrir la caisse** au début du service.
+- Le fond de caisse peut être saisi lors de l’ouverture et l’ouverture est tracée avec le nom du serveur connecté.
+- Le serveur **ne peut pas fermer la caisse**.
+- Le serveur **ne peut pas clôturer la journée**.
+- **Fermer caisse** et **Clôturer journée** restent réservés au Responsable / Administrateur / Super Admin.
+- Des contrôles supplémentaires bloquent aussi une tentative de fermeture/clôture depuis l’interface si le rôle n’est pas autorisé.
+- Le serveur conserve uniquement **Caisse + Réservations** dans la navigation.
+
+---
+
 # Restaurant Pro v2.30 — Accès établissement + PIN / NFC
 
 ## Nouveautés v2.30
