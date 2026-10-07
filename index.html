@@ -4,21 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
-<title>Restaurant Pro v2.29 — Compte administrateur par établissement</title>
+<title>Restaurant Pro v2.30 — Accès établissement + PIN / NFC</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=229">
+<link rel="stylesheet" href="style.css?v=230">
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
   <div class="login-card">
     <div class="brand big">Restaurant <span>Pro</span></div>
     <p>Démo GitHub Pages</p>
+    <div id="loginEstablishmentBanner" class="login-establishment-banner hidden"></div>
     <input id="loginUser" placeholder="Nom, identifiant ou e-mail" value="admin" autocomplete="username">
     <input id="loginPin" type="password" inputmode="numeric" placeholder="PIN" value="3333" autocomplete="current-password">
-    <button id="loginBtn" class="primary full">Connexion</button>
+    <button id="loginBtn" class="primary full">Connexion par PIN</button>
+    <button id="demoNfcBtn" class="secondary full" type="button">💳 Tester un badge NFC</button>
+    <button id="realNfcBtn" class="secondary full hidden" type="button">📡 Lire une carte NFC</button>
     <button id="forgotPinBtn" class="secondary full" type="button">PIN oublié ?</button>
-    <div class="login-help">Connexion par nom, identifiant ou e-mail + PIN.</div>
-    <div class="demo-logins">Démo : admin / 3333 · manager / 2222 · serveur / 1111 · superadmin / 9999</div>
+    <div class="login-help">Le lien d’un établissement limite la connexion au personnel autorisé. PIN ou badge NFC.</div>
+    <div class="demo-logins">Démo générale : admin / 3333 · manager / 2222 · serveur / 1111 · superadmin / 9999</div>
   </div>
 </div>
 
@@ -26,7 +29,7 @@
 <header class="topbar">
   <div>
     <div class="brand">Restaurant <span>Pro</span></div>
-    <div class="sub">v2.29 · Un compte administrateur par établissement</div>
+    <div class="sub">v2.30 · Accès établissement + PIN / NFC</div>
   </div>
   <div class="top-actions">
     <select id="establishmentSwitcher" class="establishment-switcher" title="Changer d’établissement"></select>
@@ -276,6 +279,7 @@
 <section id="page-superadmin" class="page hidden superadmin-only">
   <div class="section-title"><div><h1>🏢 Super Admin Restaurant Pro</h1><div class="muted">Clients, établissements, formules et licences.</div></div><button id="addClientBtn" class="primary">+ Nouveau client</button></div>
   <div class="commercial-warning">Cette console simule l’administration commerciale dans le navigateur. Pour vendre en production, les comptes, licences et données devront être stockés et contrôlés sur le serveur.</div>
+  <div class="portal-info">🧪 <b>Test accès personnel :</b> sur un établissement, cliquez sur <b>Tester accès</b>. Le nouveau lien reste verrouillé sur cet établissement ; un serveur autorisé n’y verra que Caisse + Réservations.</div>
   <div id="saStats" class="big-stats"></div>
   <div id="clientsAdminList" class="sa-client-list"></div>
 </section>
@@ -302,6 +306,6 @@
 </div>
 <button id="floatingReservationsBtn" class="floating-reservations">📅 Réservations</button>
 <div id="toast"></div>
-<script src="app.js?v=229"></script>
+<script src="app.js?v=230"></script>
 </body>
 </html>

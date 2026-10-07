@@ -354,3 +354,12 @@ main{padding:18px}
 .recovery-note{padding:10px 12px;border-radius:10px;background:#f8fafc;border:1px solid var(--line)}
 #forgotPinBtn{margin-top:8px}
 @media(max-width:700px){#estAccessUsers{grid-template-columns:1fr}.compact-user-btn{padding:8px 10px}}
+
+
+/* v2.30 — portail établissement + NFC */
+.login-establishment-banner{display:flex;flex-direction:column;gap:4px;padding:12px 14px;margin:8px 0 14px;border:1px solid #d1d5db;border-radius:12px;background:#f9fafb;text-align:left}
+.login-establishment-banner b{font-size:16px}.login-establishment-banner span{font-size:12px;color:#6b7280}
+.nfc-demo{display:grid;gap:14px}.nfc-user-list{display:grid;gap:8px;margin-top:4px}.nfc-user-list button{display:flex;justify-content:space-between;align-items:center;text-align:left}.nfc-user-list small{opacity:.7}
+.nfc-config-actions{display:flex;gap:8px;flex-wrap:wrap}.portal-info{margin:12px 0;padding:12px 14px;border:1px dashed #9ca3af;border-radius:12px;background:#fff}
+.sa-est-actions{flex-wrap:wrap}
+@media(max-width:700px){.nfc-config-actions{flex-direction:column}.sa-est-actions button{width:100%}}

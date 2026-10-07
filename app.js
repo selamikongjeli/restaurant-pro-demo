@@ -3,16 +3,17 @@ const money=n=>new Intl.NumberFormat('fr-BE',{style:'currency',currency:'EUR'}).
 const qs=s=>document.querySelector(s),qsa=s=>[...document.querySelectorAll(s)];
 const STORAGE='restaurantProGithubDemoV211';
 const SESSION_USER='restaurantProSessionUserV225';
+const PORTAL_PARAM='est';
 let inactivityTimer=null,appLocked=false;
 let pendingProductConfig=null;
 
 const defaults={
   user:null,migrationV228AccessDone:false,migrationV229PrimaryAdminDone:false,
   users:[
-    {id:1,username:'admin',name:'Administrateur',email:'',pin:'3333',role:'admin',active:true,clientId:1,establishmentIds:[1]},
-    {id:2,username:'manager',name:'Responsable',email:'',pin:'2222',role:'manager',active:true,clientId:1,establishmentIds:[1]},
-    {id:3,username:'serveur',name:'Serveur',email:'',pin:'1111',role:'server',active:true,clientId:1,establishmentIds:[1]},
-    {id:4,username:'superadmin',name:'Super Admin Restaurant Pro',email:'',pin:'9999',role:'superadmin',active:true,clientId:null,establishmentIds:[]}
+    {id:1,username:'admin',name:'Administrateur',email:'',pin:'3333',nfcCode:'DEMO-ADMIN-001',role:'admin',active:true,clientId:1,establishmentIds:[1]},
+    {id:2,username:'manager',name:'Responsable',email:'',pin:'2222',nfcCode:'DEMO-MANAGER-002',role:'manager',active:true,clientId:1,establishmentIds:[1]},
+    {id:3,username:'serveur',name:'Serveur',email:'',pin:'1111',nfcCode:'DEMO-SERVEUR-003',role:'server',active:true,clientId:1,establishmentIds:[1]},
+    {id:4,username:'superadmin',name:'Super Admin Restaurant Pro',email:'',pin:'9999',nfcCode:'DEMO-SUPER-004',role:'superadmin',active:true,clientId:null,establishmentIds:[]}
   ],nextUserId:5,
   clients:[{id:1,name:'Client démo',companyName:'Restaurant Pro Démo',vatNumber:'',email:'',phone:'',active:true}],nextClientId:2,
   establishments:[{id:1,clientId:1,name:'Restaurant Pro',address:'',phone:'',email:'',primaryAdminUserId:1,plan:'pro',licenseStatus:'active',licenseEnd:'',active:true}],nextEstablishmentId:2,currentEstablishmentId:1,establishmentData:{},
@@ -74,6 +75,16 @@ function licenseEffectiveStatus(est){
   return 'active';
 }
 function isEstablishmentLicensed(est){return licenseEffectiveStatus(est)==='active'}
+function requestedEstablishmentId(){
+  try{const v=new URL(location.href).searchParams.get(PORTAL_PARAM);return v&&/^\d+$/.test(v)?Number(v):null}catch{return null}
+}
+function requestedEstablishment(){const id=requestedEstablishmentId();return id?state.establishments?.find(e=>Number(e.id)===Number(id))||null:null}
+function establishmentPortalUrl(est){const u=new URL(location.href);u.search='';u.hash='';u.searchParams.set(PORTAL_PARAM,String(est.id));return u.toString()}
+function renderLoginContext(){
+  const banner=qs('#loginEstablishmentBanner'),est=requestedEstablishment();if(!banner)return;
+  if(est){banner.classList.remove('hidden');banner.innerHTML=`<b>🏪 ${esc(est.name)}</b><span>Accès personnel de cet établissement</span>`;const u=qs('#loginUser'),pin=qs('#loginPin');if(u&&u.value==='admin')u.value='';if(pin&&pin.value==='3333')pin.value=''}else banner.classList.add('hidden');
+  const nfc=qs('#realNfcBtn');if(nfc)nfc.classList.toggle('hidden',!('NDEFReader' in window));
+}
 function userCanUseEstablishment(user,est){
   if(!user||!est)return false;if(user.role==='superadmin')return true;
   if(Number(user.clientId)!==Number(est.clientId))return false;
@@ -110,19 +121,19 @@ function normalizeOperationalData(){
 function updateCurrentEstablishmentName(name){const e=currentEstablishment();if(e){e.name=name;e.updatedAt=new Date().toISOString()}state.settings.establishmentName=name}
 function renderEstablishmentSwitcher(){
   const sel=qs('#establishmentSwitcher'),badge=qs('#licenseBadge');if(!sel)return;
-  const list=accessibleEstablishments();sel.innerHTML=list.map(e=>`<option value="${e.id}" ${Number(e.id)===Number(state.currentEstablishmentId)?'selected':''}>${esc(e.name)}</option>`).join('');
-  sel.classList.toggle('hidden',list.length<=1&&state.user?.role!=='superadmin');
+  const portal=requestedEstablishment(),all=accessibleEstablishments(),list=(portal&&state.user?.role!=='superadmin')?all.filter(e=>Number(e.id)===Number(portal.id)):all;sel.innerHTML=list.map(e=>`<option value="${e.id}" ${Number(e.id)===Number(state.currentEstablishmentId)?'selected':''}>${esc(e.name)}</option>`).join('');
+  sel.classList.toggle('hidden',(portal&&state.user?.role!=='superadmin')||(list.length<=1&&state.user?.role!=='superadmin'));
   const e=currentEstablishment(),status=licenseEffectiveStatus(e);if(badge){badge.textContent=status==='active'?`${String(e?.plan||'pro').toUpperCase()} · active`:status==='expired'?'Licence expirée':'Licence suspendue';badge.className=`badge license-${status}`}
 }
 function switchEstablishment(id){
-  id=Number(id);const est=state.establishments.find(e=>Number(e.id)===id);if(!est||!userCanUseEstablishment(state.user,est))return toast('Accès non autorisé à cet établissement');
+  id=Number(id);const est=state.establishments.find(e=>Number(e.id)===id),portal=requestedEstablishment();if(portal&&state.user?.role!=='superadmin'&&Number(portal.id)!==id)return toast('Ce poste est lié à un autre établissement');if(!est||!userCanUseEstablishment(state.user,est))return toast('Accès non autorisé à cet établissement');
   if(state.user?.role!=='superadmin'&&!isEstablishmentLicensed(est))return toast('Licence inactive pour cet établissement');
   syncCurrentEstablishmentData();state.currentEstablishmentId=id;applyEstablishmentData(id);normalizeOperationalData();save();renderEstablishmentSwitcher();renderAll();applyRole();toast(`Établissement : ${est.name}`);
 }
 
 function userSnapshot(u){
   if(!u)return null;
-  return {id:Number(u.id||0),username:String(u.username||''),name:String(u.name||''),email:String(u.email||''),role:String(u.role||'server'),clientId:u.clientId==null?null:Number(u.clientId),establishmentIds:Array.isArray(u.establishmentIds)?u.establishmentIds.map(Number):[]};
+  return {id:Number(u.id||0),username:String(u.username||''),name:String(u.name||''),email:String(u.email||''),nfcCode:String(u.nfcCode||''),role:String(u.role||'server'),clientId:u.clientId==null?null:Number(u.clientId),establishmentIds:Array.isArray(u.establishmentIds)?u.establishmentIds.map(Number):[]};
 }
 function save(){
   syncCurrentEstablishmentData();
@@ -156,11 +167,11 @@ function load(){
     state.users=Array.isArray(state.users)&&state.users.length?state.users:structuredClone(defaults.users);
     state.users=state.users.map((u,index)=>({
       id:Number(u.id||index+1),username:String(u.username||u.name||('user'+(index+1))).trim().toLowerCase(),
-      name:String(u.name||u.username||('Utilisateur '+(index+1))).trim(),email:String(u.email||'').trim().toLowerCase(),pin:String(u.pin||''),
+      name:String(u.name||u.username||('Utilisateur '+(index+1))).trim(),email:String(u.email||'').trim().toLowerCase(),pin:String(u.pin||''),nfcCode:String(u.nfcCode||`RP-${String(Number(u.id||index+1)).padStart(4,'0')}`).trim().toUpperCase(),
       role:['superadmin','admin','manager','server'].includes(u.role)?u.role:'server',active:u.active!==false,
       clientId:u.role==='superadmin'?null:Number(u.clientId||1),establishmentIds:u.role==='superadmin'?[]:(Array.isArray(u.establishmentIds)&&u.establishmentIds.length?u.establishmentIds.map(Number):[1])
     }));
-    if(!state.users.some(u=>u.role==='superadmin'))state.users.push({id:Math.max(4,...state.users.map(u=>Number(u.id)||0))+1,username:'superadmin',name:'Super Admin Restaurant Pro',email:'',pin:'9999',role:'superadmin',active:true,clientId:null,establishmentIds:[]});
+    if(!state.users.some(u=>u.role==='superadmin'))state.users.push({id:Math.max(4,...state.users.map(u=>Number(u.id)||0))+1,username:'superadmin',name:'Super Admin Restaurant Pro',email:'',pin:'9999',nfcCode:'DEMO-SUPER-004',role:'superadmin',active:true,clientId:null,establishmentIds:[]});
     state.nextUserId=Math.max(Number(state.nextUserId||0)-1,...state.users.map(u=>Number(u.id)||0),0)+1;
     // v2.25 — migration commerciale : client, établissements et jeux de données séparés
     state.clients=Array.isArray(state.clients)&&state.clients.length?state.clients:structuredClone(defaults.clients);
@@ -263,18 +274,57 @@ function showApp(){
   qs('#userBadge').textContent=`${state.user.name} · ${roleLabel(state.user.role)}`;
   applyRole();renderEstablishmentSwitcher();renderAll();scheduleAutoLock();
 }
-function login(){
-  const account=findLoginAccount(qs('#loginUser').value),pin=String(qs('#loginPin').value||'');
-  if(!account||account.pin!==pin)return toast('Nom / identifiant ou PIN incorrect');
+function finishLogin(account,method='PIN'){
+  if(!account||account.active===false)return toast('Compte introuvable ou désactivé');
+  const portal=requestedEstablishment();
   state.user=userSnapshot(account);
   const list=accessibleEstablishments(state.user);
   if(!list.length){state.user=null;return toast('Aucun établissement autorisé pour ce compte')}
-  let target=state.establishments.find(e=>Number(e.id)===Number(state.currentEstablishmentId)&&userCanUseEstablishment(state.user,e))||list[0];
-  if(state.user.role!=='superadmin'){target=target&&isEstablishmentLicensed(target)?target:(list.find(isEstablishmentLicensed)||null);if(!target){state.user=null;return toast('Licence inactive : contactez votre administrateur')}}
-  state.currentEstablishmentId=Number(target.id);applyEstablishmentData(target.id);normalizeOperationalData();save();showApp();
+  let target=null;
+  if(portal){
+    if(state.user.role!=='superadmin'&&!userCanUseEstablishment(state.user,portal)){state.user=null;return toast(`Accès refusé : vous ne travaillez pas chez ${portal.name}`)}
+    if(state.user.role!=='superadmin'&&!isEstablishmentLicensed(portal)){state.user=null;return toast('Licence inactive : contactez votre administrateur')}
+    target=portal;
+  }else{
+    target=state.establishments.find(e=>Number(e.id)===Number(state.currentEstablishmentId)&&userCanUseEstablishment(state.user,e))||list[0];
+    if(state.user.role!=='superadmin'){target=target&&isEstablishmentLicensed(target)?target:(list.find(isEstablishmentLicensed)||null);if(!target){state.user=null;return toast('Licence inactive : contactez votre administrateur')}}
+  }
+  state.currentEstablishmentId=Number(target.id);applyEstablishmentData(target.id);normalizeOperationalData();save();showApp();toast(`${method} · ${account.name}`);
+}
+function login(){
+  const account=findLoginAccount(qs('#loginUser').value),pin=String(qs('#loginPin').value||'');
+  if(!account||account.pin!==pin)return toast('Nom / identifiant ou PIN incorrect');
+  finishLogin(account,'PIN');
+}
+function nfcUsersForPortal(){
+  const portal=requestedEstablishment()||currentEstablishment();
+  if(!portal)return [];
+  return state.users.filter(u=>u.active!==false&&u.role!=='superadmin'&&u.nfcCode&&userCanUseEstablishment(u,portal));
+}
+function demoNfcForm(){
+  const portal=requestedEstablishment()||currentEstablishment(),users=nfcUsersForPortal();
+  return `<div class="nfc-demo"><div class="muted">Simulation d’un passage de badge${portal?` pour <b>${esc(portal.name)}</b>`:''}. En production, le badge physique remplacera ce bouton.</div><div class="nfc-user-list">${users.map(u=>`<button class="secondary demoNfcUser" data-id="${u.id}">💳 ${esc(u.name)} <small>${esc(roleLabel(u.role))}</small></button>`).join('')||'<div class="empty">Aucun membre du personnel avec badge pour cet établissement.</div>'}</div></div>`;
+}
+function normalizeNfcCode(v){return String(v||'').trim().toUpperCase()}
+function findNfcAccount(code){const v=normalizeNfcCode(code);return state.users.find(u=>u.active!==false&&normalizeNfcCode(u.nfcCode)===v)||null}
+async function scanRealNfc(forInput=false){
+  if(!('NDEFReader' in window))return toast('NFC Web non disponible sur cet appareil');
+  try{
+    const reader=new NDEFReader();await reader.scan();toast('Approchez la carte NFC…');
+    reader.onreading=event=>{
+      const code=normalizeNfcCode(event.serialNumber||'');
+      if(forInput){const input=qs('#personNfcCode');if(input)input.value=code||'CARTE-NFC';toast('Carte NFC lue');return}
+      const account=findNfcAccount(code);if(!account)return toast('Cette carte NFC n’est associée à aucun utilisateur');finishLogin(account,'NFC');
+    };
+  }catch(err){toast('Lecture NFC impossible ou refusée')}
+}
+function generateNfcCode(){
+  try{const a=new Uint32Array(2);crypto.getRandomValues(a);return `RP-${a[0].toString(36).toUpperCase()}-${a[1].toString(36).toUpperCase()}`}catch{return `RP-${Date.now().toString(36).toUpperCase()}`}
 }
 function changeUser(){state.user=null;save();location.reload()}
 qs('#loginBtn').onclick=login;qs('#loginPin').onkeydown=e=>{if(e.key==='Enter')login()};
+qs('#demoNfcBtn').onclick=()=>modal('Tester badge NFC',demoNfcForm());
+qs('#realNfcBtn').onclick=()=>scanRealNfc(false);
 qs('#changeUserBtn').onclick=changeUser;qs('#logoutBtn').onclick=changeUser;
 
 function scheduleAutoLock(){
@@ -934,13 +984,13 @@ function personnelForm(u=null){
   const x=u||{},clientId=Number(x.clientId||currentEstablishment()?.clientId||0);
   const ests=(state.establishments||[]).filter(e=>Number(e.clientId)===clientId&&e.active!==false);
   const selected=new Set((Array.isArray(x.establishmentIds)&&x.establishmentIds.length?x.establishmentIds:[state.currentEstablishmentId]).map(Number));
-  return `<div class="form-grid"><label class="span2">Nom affiché<input id="personName" value="${esc(x.name||'')}" placeholder="Ex. Jean Dupont"></label><label>Identifiant<input id="personUsername" value="${esc(x.username||'')}" placeholder="Ex. jean"></label><label>E-mail<input id="personEmail" type="email" value="${esc(x.email||'')}" placeholder="nom@restaurant.be"></label><label>Rôle<select id="personRole"><option value="server" ${x.role==='server'||!x.role?'selected':''}>Serveur</option><option value="manager" ${x.role==='manager'?'selected':''}>Responsable</option><option value="admin" ${x.role==='admin'?'selected':''}>Administrateur</option></select></label><label class="span2">PIN ${u?'(laisser vide pour garder le PIN actuel)':''}<input id="personPin" type="password" inputmode="numeric" placeholder="Minimum 4 caractères"></label><div class="span3 establishment-access-box"><b>Établissements autorisés</b>${ests.map(e=>`<label class="checkline"><input type="checkbox" class="personEstablishmentAccess" value="${e.id}" ${selected.has(Number(e.id))?'checked':''}> ${esc(e.name)}</label>`).join('')||'<div class="muted">Aucun établissement</div>'}</div><button id="${u?'savePersonnelEdit':'savePersonnelCreate'}" ${u?`data-id="${u.id}"`:''} class="primary span3">${u?'Enregistrer':'Créer le compte'}</button></div>`;
+  return `<div class="form-grid"><label class="span2">Nom affiché<input id="personName" value="${esc(x.name||'')}" placeholder="Ex. Jean Dupont"></label><label>Identifiant<input id="personUsername" value="${esc(x.username||'')}" placeholder="Ex. jean"></label><label>E-mail<input id="personEmail" type="email" value="${esc(x.email||'')}" placeholder="nom@restaurant.be"></label><label>Rôle<select id="personRole"><option value="server" ${x.role==='server'||!x.role?'selected':''}>Serveur</option><option value="manager" ${x.role==='manager'?'selected':''}>Responsable</option><option value="admin" ${x.role==='admin'?'selected':''}>Administrateur</option></select></label><label class="span2">PIN ${u?'(laisser vide pour garder le PIN actuel)':''}<input id="personPin" type="password" inputmode="numeric" placeholder="Minimum 4 caractères"></label><label class="span2">Badge NFC / carte<input id="personNfcCode" value="${esc(x.nfcCode||'')}" placeholder="Ex. RP-ABC123"></label><div class="span3 nfc-config-actions"><button type="button" id="generatePersonnelNfc" class="secondary">🎫 Générer un code badge</button><button type="button" id="readPersonnelNfc" class="secondary">📡 Lire une carte NFC</button></div><div class="span3 establishment-access-box"><b>Établissements autorisés</b>${ests.map(e=>`<label class="checkline"><input type="checkbox" class="personEstablishmentAccess" value="${e.id}" ${selected.has(Number(e.id))?'checked':''}> ${esc(e.name)}</label>`).join('')||'<div class="muted">Aucun établissement</div>'}</div><button id="${u?'savePersonnelEdit':'savePersonnelCreate'}" ${u?`data-id="${u.id}"`:''} class="primary span3">${u?'Enregistrer':'Créer le compte'}</button></div>`;
 }
 function renderPersonnel(){
   const list=qs('#personnelList');if(!list)return;
   const clientId=Number(currentEstablishment()?.clientId||0);
   const users=state.users.filter(u=>u.role!=='superadmin'&&Number(u.clientId||clientId)===clientId);
-  list.innerHTML=users.map(u=>`<div class="personnel-row ${u.active===false?'inactive':''}"><div><b>${esc(u.name)}</b><div class="muted">${esc(u.username)}${u.email?' · '+esc(u.email):''} · ${roleLabel(u.role)}</div></div><div><span class="status-pill ${u.active===false?'off':'on'}">${u.active===false?'Désactivé':'Actif'}</span></div><div class="personnel-actions"><button class="secondary editPersonnel" data-id="${u.id}">Modifier / PIN</button>${u.active===false?`<button class="primary reactivatePersonnel" data-id="${u.id}">Réactiver</button>`:`<button class="dangerbtn deactivatePersonnel" data-id="${u.id}">Désactiver</button>`}</div></div>`).join('');
+  list.innerHTML=users.map(u=>`<div class="personnel-row ${u.active===false?'inactive':''}"><div><b>${esc(u.name)}</b><div class="muted">${esc(u.username)}${u.email?' · '+esc(u.email):''} · ${roleLabel(u.role)}${u.nfcCode?' · Badge '+esc(u.nfcCode):''}</div></div><div><span class="status-pill ${u.active===false?'off':'on'}">${u.active===false?'Désactivé':'Actif'}</span></div><div class="personnel-actions"><button class="secondary editPersonnel" data-id="${u.id}">Modifier / PIN</button>${u.active===false?`<button class="primary reactivatePersonnel" data-id="${u.id}">Réactiver</button>`:`<button class="dangerbtn deactivatePersonnel" data-id="${u.id}">Désactiver</button>`}</div></div>`).join('');
   const select=qs('#autoLockMinutes');if(select)select.value=String(Number(state.settings.autoLockMinutes||0));
 }
 function countActiveAdmins(exceptId=null){const clientId=Number(currentEstablishment()?.clientId||0);return state.users.filter(u=>u.active!==false&&u.role==='admin'&&Number(u.clientId)===clientId&&Number(u.id)!==Number(exceptId)).length}
@@ -969,7 +1019,7 @@ function renderSuperAdmin(){
   if(!isSuperAdmin())return;const clients=state.clients||[],ests=state.establishments||[];
   const active=ests.filter(e=>licenseEffectiveStatus(e)==='active').length,suspended=ests.length-active,totalRevenue=ests.reduce((sum,e)=>sum+establishmentSalesTotal(e.id),0);
   qs('#saStats').innerHTML=`<div><b>${clients.filter(c=>c.active!==false).length}</b><span>clients</span></div><div><b>${ests.length}</b><span>établissements</span></div><div><b>${active}</b><span>licences actives</span></div><div><b>${money(totalRevenue)}</b><span>CA total démo</span></div>`;
-  qs('#clientsAdminList').innerHTML=clients.map(c=>{const ce=ests.filter(e=>Number(e.clientId)===Number(c.id)),clientRevenue=ce.reduce((sum,e)=>sum+establishmentSalesTotal(e.id),0);return `<div class="sa-client-card ${c.active===false?'inactive':''}"><div class="sa-client-head"><div><h3>${esc(c.name)}</h3><div class="muted">${esc(c.companyName||'')} ${c.vatNumber?'· '+esc(c.vatNumber):''} · CA ${money(clientRevenue)}</div></div><div class="personnel-actions"><button class="secondary editClient" data-id="${c.id}">Modifier</button><button class="primary addEstablishmentForClient" data-id="${c.id}">+ Établissement</button></div></div><div class="sa-est-grid">${ce.map(e=>{const st=licenseEffectiveStatus(e),sales=establishmentSalesTotal(e.id);return `<div class="sa-est-card"><div><b>${esc(e.name)}</b><div class="muted">${planLabel(e.plan)} · ${esc(e.address||'Adresse non renseignée')}${e.email?' · '+esc(e.email):''}</div><div class="muted">Admin : ${esc(primaryAdminForEstablishment(e)?.email||primaryAdminForEstablishment(e)?.username||'à configurer')}</div><div class="muted">CA démo : <b>${money(sales)}</b>${e.licenseEnd?` · fin ${esc(e.licenseEnd)}`:''}</div></div><span class="status-pill ${st==='active'?'on':'off'}">${st==='active'?'Active':st==='expired'?'Expirée':'Suspendue'}</span><div class="sa-est-actions"><button class="secondary openEstablishment" data-id="${e.id}">Ouvrir</button><button class="secondary editEstablishment" data-id="${e.id}">Modifier</button><button class="${st==='active'?'dangerbtn':'primary'} toggleEstablishmentLicense" data-id="${e.id}">${st==='active'?'Suspendre':'Activer'}</button></div></div>`}).join('')||'<div class="empty">Aucun établissement</div>'}</div></div>`}).join('')||'<div class="empty">Aucun client</div>';
+  qs('#clientsAdminList').innerHTML=clients.map(c=>{const ce=ests.filter(e=>Number(e.clientId)===Number(c.id)),clientRevenue=ce.reduce((sum,e)=>sum+establishmentSalesTotal(e.id),0);return `<div class="sa-client-card ${c.active===false?'inactive':''}"><div class="sa-client-head"><div><h3>${esc(c.name)}</h3><div class="muted">${esc(c.companyName||'')} ${c.vatNumber?'· '+esc(c.vatNumber):''} · CA ${money(clientRevenue)}</div></div><div class="personnel-actions"><button class="secondary editClient" data-id="${c.id}">Modifier</button><button class="primary addEstablishmentForClient" data-id="${c.id}">+ Établissement</button></div></div><div class="sa-est-grid">${ce.map(e=>{const st=licenseEffectiveStatus(e),sales=establishmentSalesTotal(e.id);return `<div class="sa-est-card"><div><b>${esc(e.name)}</b><div class="muted">${planLabel(e.plan)} · ${esc(e.address||'Adresse non renseignée')}${e.email?' · '+esc(e.email):''}</div><div class="muted">Admin : ${esc(primaryAdminForEstablishment(e)?.email||primaryAdminForEstablishment(e)?.username||'à configurer')}</div><div class="muted">CA démo : <b>${money(sales)}</b>${e.licenseEnd?` · fin ${esc(e.licenseEnd)}`:''}</div></div><span class="status-pill ${st==='active'?'on':'off'}">${st==='active'?'Active':st==='expired'?'Expirée':'Suspendue'}</span><div class="sa-est-actions"><button class="secondary openEstablishment" data-id="${e.id}">Ouvrir</button><button class="secondary testEstablishmentAccess" data-id="${e.id}">🧪 Tester accès</button><button class="secondary copyEstablishmentLink" data-id="${e.id}">🔗 Lien caisse</button><button class="secondary editEstablishment" data-id="${e.id}">Modifier</button><button class="${st==='active'?'dangerbtn':'primary'} toggleEstablishmentLicense" data-id="${e.id}">${st==='active'?'Suspendre':'Activer'}</button></div></div>`}).join('')||'<div class="empty">Aucun établissement</div>'}</div></div>`}).join('')||'<div class="empty">Aucun client</div>';
 }
 
 function renderSettings(){
@@ -987,6 +1037,11 @@ qs('#addTableBtn').onclick=()=>modal('Ajouter une table',tableSettingsForm());
 
 document.addEventListener('click',e=>{
   if(e.target.id==='modalClose')closeModal();
+  if(e.target.id==='generatePersonnelNfc'){const input=qs('#personNfcCode');if(input)input.value=generateNfcCode()}
+  if(e.target.id==='readPersonnelNfc')scanRealNfc(true);
+  if(e.target.classList.contains('demoNfcUser')){const account=state.users.find(u=>Number(u.id)===Number(e.target.dataset.id));if(account){closeModal();finishLogin(account,'NFC démo')}}
+  if(e.target.classList.contains('testEstablishmentAccess')){const est=state.establishments.find(v=>Number(v.id)===Number(e.target.dataset.id));if(est)window.open(establishmentPortalUrl(est),'_blank')}
+  if(e.target.classList.contains('copyEstablishmentLink')){const est=state.establishments.find(v=>Number(v.id)===Number(e.target.dataset.id));if(est){const url=establishmentPortalUrl(est);if(navigator.clipboard?.writeText)navigator.clipboard.writeText(url).then(()=>toast('Lien caisse copié')).catch(()=>modal('Lien caisse',`<input value="${esc(url)}" readonly onclick="this.select()">`));else modal('Lien caisse',`<input value="${esc(url)}" readonly onclick="this.select()">`)}}
   if(e.target.id==='changeOwnPinBtn'){if(!state.user)return;modal('Changer mon PIN',changeOwnPinForm())}
   if(e.target.id==='forgotPinBtn'){modal('PIN oublié / récupération',pinHelpForm())}
   if(e.target.id==='saveOwnPin'){
@@ -1025,7 +1080,7 @@ document.addEventListener('click',e=>{
     if(editing){if(est){oldClientId=Number(est.clientId);Object.assign(est,data);if(state.establishmentData[String(id)]?.settings)state.establishmentData[String(id)].settings.establishmentName=name;if(Number(state.currentEstablishmentId)===id)state.settings.establishmentName=name}}
     else{est={id:state.nextEstablishmentId++,...data};estId=est.id;state.establishments.push(est);state.establishmentData[String(est.id)]=freshEstablishmentData(name)}
     if(emailOwner&&emailOwner.role==='admin'&&Number(emailOwner.clientId)===clientId){primaryAdmin=emailOwner}
-    if(!primaryAdmin){primaryAdmin={id:state.nextUserId++,name:adminName,username:uniqueUsername(name),email:adminEmail,pin:adminPin,role:'admin',active:true,clientId,establishmentIds:[Number(estId)]};state.users.push(primaryAdmin)}
+    if(!primaryAdmin){primaryAdmin={id:state.nextUserId++,name:adminName,username:uniqueUsername(name),email:adminEmail,pin:adminPin,nfcCode:generateNfcCode(),role:'admin',active:true,clientId,establishmentIds:[Number(estId)]};state.users.push(primaryAdmin)}
     else{
       primaryAdmin.name=adminName;primaryAdmin.email=adminEmail;primaryAdmin.clientId=clientId;primaryAdmin.active=true;primaryAdmin.role='admin';primaryAdmin.establishmentIds=[...new Set([...(primaryAdmin.establishmentIds||[]).map(Number),Number(estId)])];if(adminPin)primaryAdmin.pin=adminPin;
     }
@@ -1051,7 +1106,7 @@ document.addEventListener('click',e=>{
   // ===== v2.24 : personnel, PIN et rôles =====
   if(e.target.id==='savePersonnelCreate'||e.target.id==='savePersonnelEdit'){
     if(!isAdmin())return toast('Accès administrateur requis');
-    const editing=e.target.id==='savePersonnelEdit',id=Number(e.target.dataset.id||0),name=qs('#personName')?.value.trim(),username=normalizeLogin(qs('#personUsername')?.value),email=normalizeLogin(qs('#personEmail')?.value),role=qs('#personRole')?.value,pin=String(qs('#personPin')?.value||'');
+    const editing=e.target.id==='savePersonnelEdit',id=Number(e.target.dataset.id||0),name=qs('#personName')?.value.trim(),username=normalizeLogin(qs('#personUsername')?.value),email=normalizeLogin(qs('#personEmail')?.value),role=qs('#personRole')?.value,pin=String(qs('#personPin')?.value||''),nfcCode=normalizeNfcCode(qs('#personNfcCode')?.value||'');
     if(!name||!username)return toast('Nom et identifiant obligatoires');
     if(email&&!validEmail(email))return toast('Adresse e-mail invalide');
     if(!/^[a-z0-9._-]{2,30}$/.test(username))return toast('Identifiant : lettres, chiffres, point, tiret ou _');
@@ -1061,13 +1116,14 @@ document.addEventListener('click',e=>{
     if(editing&&Number(state.user?.id)===id&&!establishmentIds.includes(Number(state.currentEstablishmentId)))return toast('Gardez l’accès à l’établissement actuellement ouvert');
     if(state.users.some(u=>normalizeLogin(u.username)===username&&(!editing||Number(u.id)!==id)))return toast('Cet identifiant existe déjà');
     if(email&&state.users.some(u=>normalizeLogin(u.email)===email&&(!editing||Number(u.id)!==id)))return toast('Cette adresse e-mail est déjà utilisée par un autre compte');
+    if(nfcCode&&state.users.some(u=>normalizeNfcCode(u.nfcCode)===nfcCode&&(!editing||Number(u.id)!==id)))return toast('Ce badge NFC est déjà associé à un autre utilisateur');
     if(!editing&&pin.length<4)return toast('PIN minimum 4 caractères');
     if(editing){
       const u=state.users.find(v=>Number(v.id)===id);if(!u)return;
       if(u.role==='admin'&&role!=='admin'&&u.active!==false&&countActiveAdmins(id)<1)return toast('Il faut conserver au moins un administrateur actif');
-      Object.assign(u,{name,username,email,role,clientId,establishmentIds});if(pin){if(pin.length<4)return toast('PIN minimum 4 caractères');u.pin=pin}
+      Object.assign(u,{name,username,email,nfcCode,role,clientId,establishmentIds});if(pin){if(pin.length<4)return toast('PIN minimum 4 caractères');u.pin=pin}
       if(Number(state.user?.id)===id)state.user=userSnapshot(u);
-    }else state.users.push({id:state.nextUserId++,name,username,email,role,pin,active:true,clientId,establishmentIds});
+    }else state.users.push({id:state.nextUserId++,name,username,email,role,pin,nfcCode:nfcCode||generateNfcCode(),active:true,clientId,establishmentIds});
     save();closeModal();renderPersonnel();applyRole();qs('#userBadge').textContent=`${state.user.name} · ${roleLabel(state.user.role)}`;toast(editing?'Utilisateur modifié':'Utilisateur créé');
   }
   if(e.target.classList.contains('editPersonnel')){const u=state.users.find(v=>Number(v.id)===Number(e.target.dataset.id));if(u)modal('Modifier utilisateur',personnelForm(u))}
@@ -1208,9 +1264,13 @@ document.addEventListener('input',e=>{if(e.target?.id==='eAmount'||e.target?.id=
 function renderAll(){renderEstablishmentSwitcher();renderCash();renderTables();renderContext();renderCategories();renderProducts();renderCart();renderReservations();if(qs('#page-accounting')&&!qs('#page-accounting').classList.contains('hidden'))renderAccounting();if(qs('#page-invoices')&&!qs('#page-invoices').classList.contains('hidden'))renderInvoices()}
 load();
 normalizeOperationalData();
+const startupPortal=requestedEstablishment();if(startupPortal){state.currentEstablishmentId=Number(startupPortal.id);applyEstablishmentData(startupPortal.id);normalizeOperationalData()}
+renderLoginContext();
 if(state.user){
-  const allowed=accessibleEstablishments(state.user);let target=currentEstablishment();
-  if(!target||!userCanUseEstablishment(state.user,target)||(state.user.role!=='superadmin'&&!isEstablishmentLicensed(target)))target=state.user.role==='superadmin'?allowed[0]:allowed.find(isEstablishmentLicensed);
+  const allowed=accessibleEstablishments(state.user),portal=requestedEstablishment();let target=portal||currentEstablishment();
+  if(portal&&state.user.role!=='superadmin'&&!userCanUseEstablishment(state.user,portal))target=null;
+  if(target&&state.user.role!=='superadmin'&&!isEstablishmentLicensed(target))target=null;
+  if(!portal&&(!target||!userCanUseEstablishment(state.user,target)))target=state.user.role==='superadmin'?allowed[0]:allowed.find(isEstablishmentLicensed);
   if(target){state.currentEstablishmentId=Number(target.id);applyEstablishmentData(target.id);normalizeOperationalData()}else state.user=null;
 }
 state.cart=consolidateCart(state.cart||[]);

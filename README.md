@@ -1,3 +1,21 @@
+# Restaurant Pro v2.30 — Accès établissement + PIN / NFC
+
+## Nouveautés v2.30
+
+- Chaque établissement possède maintenant un **lien de caisse dédié** de type `?est=ID` pour tester l’accès du personnel.
+- Depuis **Super Admin**, boutons **🧪 Tester accès** et **🔗 Lien caisse** sur chaque établissement.
+- Sur un lien établissement, un serveur ne peut se connecter que s’il est autorisé sur cet établissement.
+- Le serveur conserve uniquement **Caisse + Réservations** selon les droits déjà en place.
+- Connexion du personnel par **PIN** ou par **badge NFC**.
+- Ajout d’un identifiant de badge NFC sur chaque fiche personnel, avec génération d’un code de démonstration.
+- Bouton **💳 Tester un badge NFC** sur l’écran de connexion pour simuler le passage d’une carte sans matériel.
+- Si le navigateur prend en charge Web NFC, bouton **📡 Lire une carte NFC** et possibilité d’associer la carte depuis la fiche personnel.
+- Le mode lien établissement verrouille le sélecteur d’établissement pour les comptes non Super Admin.
+
+> Démo : les liens dédiés fonctionnent avec les données stockées dans le même navigateur/origine GitHub Pages. Pour les partager réellement entre appareils et restaurants, il faudra la future version serveur Render + PostgreSQL. Web NFC dépend aussi du navigateur/appareil ; le simulateur reste disponible partout.
+
+---
+
 # Restaurant Pro v2.29 — Compte administrateur par établissement
 
 ## Nouveautés v2.29
