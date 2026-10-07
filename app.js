@@ -7,12 +7,12 @@ let inactivityTimer=null,appLocked=false;
 let pendingProductConfig=null;
 
 const defaults={
-  user:null,
+  user:null,migrationV228AccessDone:false,
   users:[
-    {id:1,username:'admin',name:'Administrateur',pin:'3333',role:'admin',active:true,clientId:1,establishmentIds:[1]},
-    {id:2,username:'manager',name:'Responsable',pin:'2222',role:'manager',active:true,clientId:1,establishmentIds:[1]},
-    {id:3,username:'serveur',name:'Serveur',pin:'1111',role:'server',active:true,clientId:1,establishmentIds:[1]},
-    {id:4,username:'superadmin',name:'Super Admin Restaurant Pro',pin:'9999',role:'superadmin',active:true,clientId:null,establishmentIds:[]}
+    {id:1,username:'admin',name:'Administrateur',email:'',pin:'3333',role:'admin',active:true,clientId:1,establishmentIds:[1]},
+    {id:2,username:'manager',name:'Responsable',email:'',pin:'2222',role:'manager',active:true,clientId:1,establishmentIds:[1]},
+    {id:3,username:'serveur',name:'Serveur',email:'',pin:'1111',role:'server',active:true,clientId:1,establishmentIds:[1]},
+    {id:4,username:'superadmin',name:'Super Admin Restaurant Pro',email:'',pin:'9999',role:'superadmin',active:true,clientId:null,establishmentIds:[]}
   ],nextUserId:5,
   clients:[{id:1,name:'Client démo',companyName:'Restaurant Pro Démo',vatNumber:'',email:'',phone:'',active:true}],nextClientId:2,
   establishments:[{id:1,clientId:1,name:'Restaurant Pro',address:'',phone:'',email:'',plan:'pro',licenseStatus:'active',licenseEnd:'',active:true}],nextEstablishmentId:2,currentEstablishmentId:1,establishmentData:{},
@@ -122,7 +122,7 @@ function switchEstablishment(id){
 
 function userSnapshot(u){
   if(!u)return null;
-  return {id:Number(u.id||0),username:String(u.username||''),name:String(u.name||''),role:String(u.role||'server'),clientId:u.clientId==null?null:Number(u.clientId),establishmentIds:Array.isArray(u.establishmentIds)?u.establishmentIds.map(Number):[]};
+  return {id:Number(u.id||0),username:String(u.username||''),name:String(u.name||''),email:String(u.email||''),role:String(u.role||'server'),clientId:u.clientId==null?null:Number(u.clientId),establishmentIds:Array.isArray(u.establishmentIds)?u.establishmentIds.map(Number):[]};
 }
 function save(){
   syncCurrentEstablishmentData();
@@ -156,15 +156,18 @@ function load(){
     state.users=Array.isArray(state.users)&&state.users.length?state.users:structuredClone(defaults.users);
     state.users=state.users.map((u,index)=>({
       id:Number(u.id||index+1),username:String(u.username||u.name||('user'+(index+1))).trim().toLowerCase(),
-      name:String(u.name||u.username||('Utilisateur '+(index+1))).trim(),pin:String(u.pin||''),
+      name:String(u.name||u.username||('Utilisateur '+(index+1))).trim(),email:String(u.email||'').trim().toLowerCase(),pin:String(u.pin||''),
       role:['superadmin','admin','manager','server'].includes(u.role)?u.role:'server',active:u.active!==false,
       clientId:u.role==='superadmin'?null:Number(u.clientId||1),establishmentIds:u.role==='superadmin'?[]:(Array.isArray(u.establishmentIds)&&u.establishmentIds.length?u.establishmentIds.map(Number):[1])
     }));
-    if(!state.users.some(u=>u.role==='superadmin'))state.users.push({id:Math.max(4,...state.users.map(u=>Number(u.id)||0))+1,username:'superadmin',name:'Super Admin Restaurant Pro',pin:'9999',role:'superadmin',active:true,clientId:null,establishmentIds:[]});
+    if(!state.users.some(u=>u.role==='superadmin'))state.users.push({id:Math.max(4,...state.users.map(u=>Number(u.id)||0))+1,username:'superadmin',name:'Super Admin Restaurant Pro',email:'',pin:'9999',role:'superadmin',active:true,clientId:null,establishmentIds:[]});
     state.nextUserId=Math.max(Number(state.nextUserId||0)-1,...state.users.map(u=>Number(u.id)||0),0)+1;
     // v2.25 — migration commerciale : client, établissements et jeux de données séparés
     state.clients=Array.isArray(state.clients)&&state.clients.length?state.clients:structuredClone(defaults.clients);
     state.establishments=Array.isArray(state.establishments)&&state.establishments.length?state.establishments:structuredClone(defaults.establishments);
+    state.establishments=state.establishments.map(e=>({...e,email:String(e.email||'').trim().toLowerCase()}));
+    // v2.28 — correction unique des anciennes données : un admin du client récupère les établissements déjà créés.
+    if(!state.migrationV228AccessDone){state.users.forEach(u=>{if(u.role!=='admin'||u.active===false)return;const ids=state.establishments.filter(e=>Number(e.clientId)===Number(u.clientId)&&e.active!==false).map(e=>Number(e.id));u.establishmentIds=[...new Set([...(u.establishmentIds||[]).map(Number),...ids])]});state.migrationV228AccessDone=true}
     state.nextClientId=Math.max(Number(state.nextClientId||0)-1,...state.clients.map(v=>Number(v.id)||0),0)+1;
     state.nextEstablishmentId=Math.max(Number(state.nextEstablishmentId||0)-1,...state.establishments.map(v=>Number(v.id)||0),0)+1;
     state.currentEstablishmentId=Number(state.currentEstablishmentId||state.establishments[0]?.id||1);
@@ -226,7 +229,17 @@ function canAccessPage(name){
 }
 function currentAccount(){return state.users.find(u=>u.active!==false&&(Number(u.id)===Number(state.user?.id)||u.username===state.user?.username))||null}
 function normalizeLogin(v){return String(v||'').trim().toLowerCase()}
-function findLoginAccount(value){const v=normalizeLogin(value);return state.users.find(u=>u.active!==false&&(normalizeLogin(u.username)===v||normalizeLogin(u.name)===v))||null}
+function findLoginAccount(value){const v=normalizeLogin(value);return state.users.find(u=>u.active!==false&&(normalizeLogin(u.username)===v||normalizeLogin(u.name)===v||normalizeLogin(u.email)===v))||null}
+function validEmail(v){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v||'').trim())}
+function maskEmail(v){const email=String(v||'').trim();const [a,b]=email.split('@');if(!a||!b)return email;return `${a.slice(0,2)}${'*'.repeat(Math.max(2,a.length-2))}@${b}`}
+function changeOwnPinForm(){
+  const account=currentAccount();const est=currentEstablishment();
+  return `<div class="form-grid"><div class="span3 muted">Compte : <b>${esc(account?.name||state.user?.name||'')}</b>${est?` · ${esc(est.name)}`:''}</div><label class="span3">PIN actuel<input id="ownPinCurrent" type="password" inputmode="numeric" autocomplete="current-password"></label><label>Nouvel PIN<input id="ownPinNew" type="password" inputmode="numeric" autocomplete="new-password" placeholder="Minimum 4 chiffres"></label><label>Confirmer<input id="ownPinConfirm" type="password" inputmode="numeric" autocomplete="new-password"></label><button id="saveOwnPin" class="primary span3">Changer mon PIN</button><div class="span3 recovery-note">E-mail de récupération de l’établissement : <b>${esc(est?.email?maskEmail(est.email):'non renseigné')}</b></div></div>`;
+}
+function pinHelpForm(){
+  const ests=(state.establishments||[]).filter(e=>e.active!==false);
+  return `<div class="form-grid"><div class="span3 muted">Pour des raisons de sécurité, le PIN n’est jamais changé uniquement avec une adresse e-mail. Dans cette version GitHub Pages, la récupération ouvre une demande vers l’e-mail de l’établissement. L’administrateur pourra ensuite réinitialiser le PIN.</div><label class="span2">Identifiant ou e-mail du compte<input id="pinHelpUser" autocomplete="username"></label><label>Établissement<select id="pinHelpEst">${ests.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}</select></label><button id="requestPinReset" class="primary span3">Demander la réinitialisation</button></div>`;
+}
 
 function applyRole(){
   qsa('.manager-only').forEach(el=>el.classList.toggle('role-hidden',!isManager()));
@@ -916,13 +929,13 @@ function personnelForm(u=null){
   const x=u||{},clientId=Number(x.clientId||currentEstablishment()?.clientId||0);
   const ests=(state.establishments||[]).filter(e=>Number(e.clientId)===clientId&&e.active!==false);
   const selected=new Set((Array.isArray(x.establishmentIds)&&x.establishmentIds.length?x.establishmentIds:[state.currentEstablishmentId]).map(Number));
-  return `<div class="form-grid"><label class="span2">Nom affiché<input id="personName" value="${esc(x.name||'')}" placeholder="Ex. Jean Dupont"></label><label>Identifiant<input id="personUsername" value="${esc(x.username||'')}" placeholder="Ex. jean"></label><label>Rôle<select id="personRole"><option value="server" ${x.role==='server'||!x.role?'selected':''}>Serveur</option><option value="manager" ${x.role==='manager'?'selected':''}>Responsable</option><option value="admin" ${x.role==='admin'?'selected':''}>Administrateur</option></select></label><label class="span2">PIN ${u?'(laisser vide pour garder le PIN actuel)':''}<input id="personPin" type="password" inputmode="numeric" placeholder="Minimum 4 caractères"></label><div class="span3 establishment-access-box"><b>Établissements autorisés</b>${ests.map(e=>`<label class="checkline"><input type="checkbox" class="personEstablishmentAccess" value="${e.id}" ${selected.has(Number(e.id))?'checked':''}> ${esc(e.name)}</label>`).join('')||'<div class="muted">Aucun établissement</div>'}</div><button id="${u?'savePersonnelEdit':'savePersonnelCreate'}" ${u?`data-id="${u.id}"`:''} class="primary span3">${u?'Enregistrer':'Créer le compte'}</button></div>`;
+  return `<div class="form-grid"><label class="span2">Nom affiché<input id="personName" value="${esc(x.name||'')}" placeholder="Ex. Jean Dupont"></label><label>Identifiant<input id="personUsername" value="${esc(x.username||'')}" placeholder="Ex. jean"></label><label>E-mail<input id="personEmail" type="email" value="${esc(x.email||'')}" placeholder="nom@restaurant.be"></label><label>Rôle<select id="personRole"><option value="server" ${x.role==='server'||!x.role?'selected':''}>Serveur</option><option value="manager" ${x.role==='manager'?'selected':''}>Responsable</option><option value="admin" ${x.role==='admin'?'selected':''}>Administrateur</option></select></label><label class="span2">PIN ${u?'(laisser vide pour garder le PIN actuel)':''}<input id="personPin" type="password" inputmode="numeric" placeholder="Minimum 4 caractères"></label><div class="span3 establishment-access-box"><b>Établissements autorisés</b>${ests.map(e=>`<label class="checkline"><input type="checkbox" class="personEstablishmentAccess" value="${e.id}" ${selected.has(Number(e.id))?'checked':''}> ${esc(e.name)}</label>`).join('')||'<div class="muted">Aucun établissement</div>'}</div><button id="${u?'savePersonnelEdit':'savePersonnelCreate'}" ${u?`data-id="${u.id}"`:''} class="primary span3">${u?'Enregistrer':'Créer le compte'}</button></div>`;
 }
 function renderPersonnel(){
   const list=qs('#personnelList');if(!list)return;
   const clientId=Number(currentEstablishment()?.clientId||0);
   const users=state.users.filter(u=>u.role!=='superadmin'&&Number(u.clientId||clientId)===clientId);
-  list.innerHTML=users.map(u=>`<div class="personnel-row ${u.active===false?'inactive':''}"><div><b>${esc(u.name)}</b><div class="muted">${esc(u.username)} · ${roleLabel(u.role)}</div></div><div><span class="status-pill ${u.active===false?'off':'on'}">${u.active===false?'Désactivé':'Actif'}</span></div><div class="personnel-actions"><button class="secondary editPersonnel" data-id="${u.id}">Modifier / PIN</button>${u.active===false?`<button class="primary reactivatePersonnel" data-id="${u.id}">Réactiver</button>`:`<button class="dangerbtn deactivatePersonnel" data-id="${u.id}">Désactiver</button>`}</div></div>`).join('');
+  list.innerHTML=users.map(u=>`<div class="personnel-row ${u.active===false?'inactive':''}"><div><b>${esc(u.name)}</b><div class="muted">${esc(u.username)}${u.email?' · '+esc(u.email):''} · ${roleLabel(u.role)}</div></div><div><span class="status-pill ${u.active===false?'off':'on'}">${u.active===false?'Désactivé':'Actif'}</span></div><div class="personnel-actions"><button class="secondary editPersonnel" data-id="${u.id}">Modifier / PIN</button>${u.active===false?`<button class="primary reactivatePersonnel" data-id="${u.id}">Réactiver</button>`:`<button class="dangerbtn deactivatePersonnel" data-id="${u.id}">Désactiver</button>`}</div></div>`).join('');
   const select=qs('#autoLockMinutes');if(select)select.value=String(Number(state.settings.autoLockMinutes||0));
 }
 function countActiveAdmins(exceptId=null){const clientId=Number(currentEstablishment()?.clientId||0);return state.users.filter(u=>u.active!==false&&u.role==='admin'&&Number(u.clientId)===clientId&&Number(u.id)!==Number(exceptId)).length}
@@ -932,15 +945,25 @@ function clientById(id){return state.clients.find(c=>Number(c.id)===Number(id))|
 function planLabel(plan){return plan==='basic'?'Basic':plan==='multi'?'Multi-sites':'Pro'}
 function establishmentSalesTotal(id){const data=Number(id)===Number(state.currentEstablishmentId)?state:state.establishmentData?.[String(id)];return (data?.payments||[]).reduce((a,p)=>a+Number(p.total||0),0)}
 function clientForm(c=null){const x=c||{};return `<div class="form-grid"><label class="span2">Nom client<input id="clientName" value="${esc(x.name||'')}" placeholder="Ex. Groupe Dupont"></label><label class="span2">Société<input id="clientCompany" value="${esc(x.companyName||'')}"></label><label>N° TVA<input id="clientVat" value="${esc(x.vatNumber||'')}"></label><label>Email<input id="clientEmail" type="email" value="${esc(x.email||'')}"></label><label>Téléphone<input id="clientPhone" value="${esc(x.phone||'')}"></label><button id="${c?'saveClientEdit':'saveClientCreate'}" ${c?`data-id="${c.id}"`:''} class="primary span3">${c?'Enregistrer':'Créer le client'}</button></div>`}
+function establishmentAccessUsers(clientId,estId=null){
+  const users=(state.users||[]).filter(u=>u.role!=='superadmin'&&u.active!==false&&Number(u.clientId)===Number(clientId));
+  return users.map(u=>({u,checked:estId?Array.isArray(u.establishmentIds)&&u.establishmentIds.map(Number).includes(Number(estId)):u.role==='admin'}));
+}
+function establishmentAccessHtml(clientId,estId=null){
+  const rows=establishmentAccessUsers(clientId,estId);
+  return rows.length?rows.map(({u,checked})=>`<label class="checkline"><input type="checkbox" class="establishmentUserAccess" value="${u.id}" ${checked?'checked':''}> ${esc(u.name)} · ${roleLabel(u.role)}${u.email?' · '+esc(u.email):''}</label>`).join(''):'<div class="muted">Aucun utilisateur pour ce client. Les administrateurs pourront être ajoutés ensuite dans Personnel.</div>';
+}
+function refreshEstablishmentAccessPicker(clientId,estId=null){const box=qs('#estAccessUsers');if(box)box.innerHTML=establishmentAccessHtml(Number(clientId),estId)}
 function establishmentForm(e=null,forcedClientId=null){
   const x=e||{},clientId=Number(x.clientId||forcedClientId||state.clients[0]?.id||0);
-  return `<div class="form-grid"><label class="span2">Établissement<input id="estName" value="${esc(x.name||'')}" placeholder="Ex. Brasserie Centrale"></label><label>Client<select id="estClient">${state.clients.filter(c=>c.active!==false).map(c=>`<option value="${c.id}" ${Number(c.id)===clientId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label><label>Formule<select id="estPlan"><option value="basic" ${x.plan==='basic'?'selected':''}>Basic</option><option value="pro" ${x.plan==='pro'||!x.plan?'selected':''}>Pro</option><option value="multi" ${x.plan==='multi'?'selected':''}>Multi-sites</option></select></label><label>Licence<select id="estLicenseStatus"><option value="active" ${x.licenseStatus==='active'||!x.licenseStatus?'selected':''}>Active</option><option value="suspended" ${x.licenseStatus==='suspended'?'selected':''}>Suspendue</option><option value="expired" ${x.licenseStatus==='expired'?'selected':''}>Expirée</option></select></label><label>Fin de licence<input id="estLicenseEnd" type="date" value="${esc(x.licenseEnd||'')}"></label><label class="span2">Adresse<input id="estAddress" value="${esc(x.address||'')}"></label><label>Téléphone<input id="estPhone" value="${esc(x.phone||'')}"></label><label>Email<input id="estEmail" type="email" value="${esc(x.email||'')}"></label><button id="${e?'saveEstablishmentEdit':'saveEstablishmentCreate'}" ${e?`data-id="${e.id}"`:''} class="primary span3">${e?'Enregistrer':'Créer l’établissement'}</button></div>`
+  return `<div class="form-grid"><label class="span2">Établissement<input id="estName" value="${esc(x.name||'')}" placeholder="Ex. Brasserie Centrale"></label><label>Client<select id="estClient" data-edit-est-id="${e?e.id:''}">${state.clients.filter(c=>c.active!==false).map(c=>`<option value="${c.id}" ${Number(c.id)===clientId?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label><label>Formule<select id="estPlan"><option value="basic" ${x.plan==='basic'?'selected':''}>Basic</option><option value="pro" ${x.plan==='pro'||!x.plan?'selected':''}>Pro</option><option value="multi" ${x.plan==='multi'?'selected':''}>Multi-sites</option></select></label><label>Licence<select id="estLicenseStatus"><option value="active" ${x.licenseStatus==='active'||!x.licenseStatus?'selected':''}>Active</option><option value="suspended" ${x.licenseStatus==='suspended'?'selected':''}>Suspendue</option><option value="expired" ${x.licenseStatus==='expired'?'selected':''}>Expirée</option></select></label><label>Fin de licence<input id="estLicenseEnd" type="date" value="${esc(x.licenseEnd||'')}"></label><label class="span2">Adresse<input id="estAddress" value="${esc(x.address||'')}"></label><label>Téléphone<input id="estPhone" value="${esc(x.phone||'')}"></label><label class="span2">E-mail établissement / récupération PIN<input id="estEmail" type="email" value="${esc(x.email||'')}" placeholder="direction@restaurant.be"></label><div class="span3 establishment-access-box"><div class="access-box-title"><b>Personnel autorisé dans cet établissement</b><span class="muted">Les administrateurs du client sont cochés automatiquement lors de la création.</span></div><div id="estAccessUsers">${establishmentAccessHtml(clientId,e?.id||null)}</div></div><button id="${e?'saveEstablishmentEdit':'saveEstablishmentCreate'}" ${e?`data-id="${e.id}"`:''} class="primary span3">${e?'Enregistrer':'Créer l’établissement'}</button></div>`;
 }
+
 function renderSuperAdmin(){
   if(!isSuperAdmin())return;const clients=state.clients||[],ests=state.establishments||[];
   const active=ests.filter(e=>licenseEffectiveStatus(e)==='active').length,suspended=ests.length-active,totalRevenue=ests.reduce((sum,e)=>sum+establishmentSalesTotal(e.id),0);
   qs('#saStats').innerHTML=`<div><b>${clients.filter(c=>c.active!==false).length}</b><span>clients</span></div><div><b>${ests.length}</b><span>établissements</span></div><div><b>${active}</b><span>licences actives</span></div><div><b>${money(totalRevenue)}</b><span>CA total démo</span></div>`;
-  qs('#clientsAdminList').innerHTML=clients.map(c=>{const ce=ests.filter(e=>Number(e.clientId)===Number(c.id)),clientRevenue=ce.reduce((sum,e)=>sum+establishmentSalesTotal(e.id),0);return `<div class="sa-client-card ${c.active===false?'inactive':''}"><div class="sa-client-head"><div><h3>${esc(c.name)}</h3><div class="muted">${esc(c.companyName||'')} ${c.vatNumber?'· '+esc(c.vatNumber):''} · CA ${money(clientRevenue)}</div></div><div class="personnel-actions"><button class="secondary editClient" data-id="${c.id}">Modifier</button><button class="primary addEstablishmentForClient" data-id="${c.id}">+ Établissement</button></div></div><div class="sa-est-grid">${ce.map(e=>{const st=licenseEffectiveStatus(e),sales=establishmentSalesTotal(e.id);return `<div class="sa-est-card"><div><b>${esc(e.name)}</b><div class="muted">${planLabel(e.plan)} · ${esc(e.address||'Adresse non renseignée')}</div><div class="muted">CA démo : <b>${money(sales)}</b>${e.licenseEnd?` · fin ${esc(e.licenseEnd)}`:''}</div></div><span class="status-pill ${st==='active'?'on':'off'}">${st==='active'?'Active':st==='expired'?'Expirée':'Suspendue'}</span><div class="sa-est-actions"><button class="secondary openEstablishment" data-id="${e.id}">Ouvrir</button><button class="secondary editEstablishment" data-id="${e.id}">Modifier</button><button class="${st==='active'?'dangerbtn':'primary'} toggleEstablishmentLicense" data-id="${e.id}">${st==='active'?'Suspendre':'Activer'}</button></div></div>`}).join('')||'<div class="empty">Aucun établissement</div>'}</div></div>`}).join('')||'<div class="empty">Aucun client</div>';
+  qs('#clientsAdminList').innerHTML=clients.map(c=>{const ce=ests.filter(e=>Number(e.clientId)===Number(c.id)),clientRevenue=ce.reduce((sum,e)=>sum+establishmentSalesTotal(e.id),0);return `<div class="sa-client-card ${c.active===false?'inactive':''}"><div class="sa-client-head"><div><h3>${esc(c.name)}</h3><div class="muted">${esc(c.companyName||'')} ${c.vatNumber?'· '+esc(c.vatNumber):''} · CA ${money(clientRevenue)}</div></div><div class="personnel-actions"><button class="secondary editClient" data-id="${c.id}">Modifier</button><button class="primary addEstablishmentForClient" data-id="${c.id}">+ Établissement</button></div></div><div class="sa-est-grid">${ce.map(e=>{const st=licenseEffectiveStatus(e),sales=establishmentSalesTotal(e.id);return `<div class="sa-est-card"><div><b>${esc(e.name)}</b><div class="muted">${planLabel(e.plan)} · ${esc(e.address||'Adresse non renseignée')}${e.email?' · '+esc(e.email):''}</div><div class="muted">CA démo : <b>${money(sales)}</b>${e.licenseEnd?` · fin ${esc(e.licenseEnd)}`:''}</div></div><span class="status-pill ${st==='active'?'on':'off'}">${st==='active'?'Active':st==='expired'?'Expirée':'Suspendue'}</span><div class="sa-est-actions"><button class="secondary openEstablishment" data-id="${e.id}">Ouvrir</button><button class="secondary editEstablishment" data-id="${e.id}">Modifier</button><button class="${st==='active'?'dangerbtn':'primary'} toggleEstablishmentLicense" data-id="${e.id}">${st==='active'?'Suspendre':'Activer'}</button></div></div>`}).join('')||'<div class="empty">Aucun établissement</div>'}</div></div>`}).join('')||'<div class="empty">Aucun client</div>';
 }
 
 function renderSettings(){
@@ -958,6 +981,18 @@ qs('#addTableBtn').onclick=()=>modal('Ajouter une table',tableSettingsForm());
 
 document.addEventListener('click',e=>{
   if(e.target.id==='modalClose')closeModal();
+  if(e.target.id==='changeOwnPinBtn'){if(!state.user)return;modal('Changer mon PIN',changeOwnPinForm())}
+  if(e.target.id==='forgotPinBtn'){modal('PIN oublié / récupération',pinHelpForm())}
+  if(e.target.id==='saveOwnPin'){
+    const account=currentAccount(),current=String(qs('#ownPinCurrent')?.value||''),next=String(qs('#ownPinNew')?.value||''),confirmPin=String(qs('#ownPinConfirm')?.value||'');
+    if(!account||current!==String(account.pin))return toast('PIN actuel incorrect');if(next.length<4)return toast('Nouveau PIN : minimum 4 caractères');if(next!==confirmPin)return toast('Les deux nouveaux PIN ne correspondent pas');if(next===current)return toast('Choisissez un nouveau PIN différent');
+    account.pin=next;save();closeModal();toast('Votre PIN a été modifié');
+  }
+  if(e.target.id==='requestPinReset'){
+    const login=normalizeLogin(qs('#pinHelpUser')?.value),est=state.establishments.find(v=>Number(v.id)===Number(qs('#pinHelpEst')?.value));if(!login)return toast('Indiquez votre identifiant ou e-mail');if(!est||!validEmail(est.email))return toast('Aucun e-mail de récupération configuré pour cet établissement');
+    const account=state.users.find(u=>u.active!==false&&(normalizeLogin(u.username)===login||normalizeLogin(u.email)===login)&&userCanUseEstablishment(u,est));if(!account)return toast('Compte introuvable pour cet établissement');
+    const subject=encodeURIComponent(`Restaurant Pro — demande de réinitialisation PIN — ${est.name}`),body=encodeURIComponent(`Bonjour,\n\nJe demande la réinitialisation de mon PIN Restaurant Pro.\n\nÉtablissement : ${est.name}\nUtilisateur : ${account.name} (${account.username})\n\nMerci.`);window.location.href=`mailto:${est.email}?subject=${subject}&body=${body}`;closeModal();
+  }
 
   // ===== v2.25 : Super Admin, clients, établissements et licences =====
   if(e.target.id==='addClientBtn'){if(!isSuperAdmin())return toast('Accès Super Admin requis');modal('Nouveau client',clientForm())}
@@ -968,11 +1003,30 @@ document.addEventListener('click',e=>{
   }
   if(e.target.classList.contains('editClient')){const c=clientById(Number(e.target.dataset.id));if(c)modal('Modifier le client',clientForm(c))}
   if(e.target.id==='saveEstablishmentCreate'||e.target.id==='saveEstablishmentEdit'){
-    if(!isSuperAdmin())return toast('Accès Super Admin requis');const editing=e.target.id==='saveEstablishmentEdit',id=Number(e.target.dataset.id||0),name=qs('#estName')?.value.trim();if(!name)return toast('Nom établissement obligatoire');
-    const data={name,clientId:Number(qs('#estClient')?.value),plan:qs('#estPlan')?.value||'pro',licenseStatus:qs('#estLicenseStatus')?.value||'active',licenseEnd:qs('#estLicenseEnd')?.value||'',address:qs('#estAddress')?.value.trim(),phone:qs('#estPhone')?.value.trim(),email:qs('#estEmail')?.value.trim(),active:true};
-    if(editing){const est=state.establishments.find(v=>Number(v.id)===id);if(est){Object.assign(est,data);if(state.establishmentData[String(id)]?.settings)state.establishmentData[String(id)].settings.establishmentName=name;if(Number(state.currentEstablishmentId)===id)state.settings.establishmentName=name}}
-    else{const est={id:state.nextEstablishmentId++,...data};state.establishments.push(est);state.establishmentData[String(est.id)]=freshEstablishmentData(name)}
-    save();closeModal();renderEstablishmentSwitcher();renderSuperAdmin();toast(editing?'Établissement modifié':'Établissement créé');
+    if(!isSuperAdmin())return toast('Accès Super Admin requis');
+    const editing=e.target.id==='saveEstablishmentEdit',id=Number(e.target.dataset.id||0),name=qs('#estName')?.value.trim();if(!name)return toast('Nom établissement obligatoire');
+    const clientId=Number(qs('#estClient')?.value),email=normalizeLogin(qs('#estEmail')?.value);
+    if(!validEmail(email))return toast('E-mail de l’établissement obligatoire et valide');
+    const data={name,clientId,plan:qs('#estPlan')?.value||'pro',licenseStatus:qs('#estLicenseStatus')?.value||'active',licenseEnd:qs('#estLicenseEnd')?.value||'',address:qs('#estAddress')?.value.trim(),phone:qs('#estPhone')?.value.trim(),email,active:true};
+    let estId=id,oldClientId=null;
+    if(editing){const est=state.establishments.find(v=>Number(v.id)===id);if(est){oldClientId=Number(est.clientId);Object.assign(est,data);if(state.establishmentData[String(id)]?.settings)state.establishmentData[String(id)].settings.establishmentName=name;if(Number(state.currentEstablishmentId)===id)state.settings.establishmentName=name}}
+    else{const est={id:state.nextEstablishmentId++,...data};estId=est.id;state.establishments.push(est);state.establishmentData[String(est.id)]=freshEstablishmentData(name)}
+    const selectedIds=new Set(qsa('.establishmentUserAccess:checked').map(x=>Number(x.value)));
+    // Si aucun utilisateur n’a été coché à la création, les administrateurs actifs du client reçoivent automatiquement l’accès.
+    if(!editing&&selectedIds.size===0)state.users.filter(u=>u.active!==false&&u.role==='admin'&&Number(u.clientId)===clientId).forEach(u=>selectedIds.add(Number(u.id)));
+    state.users.forEach(u=>{
+      if(u.role==='superadmin')return;
+      u.establishmentIds=Array.isArray(u.establishmentIds)?u.establishmentIds.map(Number):[];
+      if(editing&&oldClientId!=null&&Number(u.clientId)===oldClientId&&oldClientId!==clientId)u.establishmentIds=u.establishmentIds.filter(v=>Number(v)!==Number(estId));
+      if(Number(u.clientId)!==clientId)return;
+      if(selectedIds.has(Number(u.id)))u.establishmentIds=[...new Set([...u.establishmentIds,Number(estId)])];
+      else u.establishmentIds=u.establishmentIds.filter(v=>Number(v)!==Number(estId));
+    });
+    // Un administrateur actif du même client doit toujours pouvoir ouvrir l’établissement.
+    if(!state.users.some(u=>u.active!==false&&u.role==='admin'&&Number(u.clientId)===clientId&&(u.establishmentIds||[]).map(Number).includes(Number(estId)))){
+      const admin=state.users.find(u=>u.active!==false&&u.role==='admin'&&Number(u.clientId)===clientId);if(admin)admin.establishmentIds=[...new Set([...(admin.establishmentIds||[]).map(Number),Number(estId)])];
+    }
+    save();closeModal();renderEstablishmentSwitcher();renderSuperAdmin();toast(editing?'Établissement modifié':'Établissement créé et accès attribués');
   }
   if(e.target.classList.contains('addEstablishmentForClient'))modal('Nouvel établissement',establishmentForm(null,Number(e.target.dataset.id)));
   if(e.target.classList.contains('editEstablishment')){const est=state.establishments.find(v=>Number(v.id)===Number(e.target.dataset.id));if(est)modal('Modifier l’établissement',establishmentForm(est))}
@@ -982,21 +1036,23 @@ document.addEventListener('click',e=>{
   // ===== v2.24 : personnel, PIN et rôles =====
   if(e.target.id==='savePersonnelCreate'||e.target.id==='savePersonnelEdit'){
     if(!isAdmin())return toast('Accès administrateur requis');
-    const editing=e.target.id==='savePersonnelEdit',id=Number(e.target.dataset.id||0),name=qs('#personName')?.value.trim(),username=normalizeLogin(qs('#personUsername')?.value),role=qs('#personRole')?.value,pin=String(qs('#personPin')?.value||'');
+    const editing=e.target.id==='savePersonnelEdit',id=Number(e.target.dataset.id||0),name=qs('#personName')?.value.trim(),username=normalizeLogin(qs('#personUsername')?.value),email=normalizeLogin(qs('#personEmail')?.value),role=qs('#personRole')?.value,pin=String(qs('#personPin')?.value||'');
     if(!name||!username)return toast('Nom et identifiant obligatoires');
+    if(email&&!validEmail(email))return toast('Adresse e-mail invalide');
     if(!/^[a-z0-9._-]{2,30}$/.test(username))return toast('Identifiant : lettres, chiffres, point, tiret ou _');
     if(!['server','manager','admin'].includes(role))return toast('Rôle invalide');
     const establishmentIds=qsa('.personEstablishmentAccess:checked').map(x=>Number(x.value));if(!establishmentIds.length)return toast('Choisissez au moins un établissement');
     const clientId=Number(currentEstablishment()?.clientId||0);
     if(editing&&Number(state.user?.id)===id&&!establishmentIds.includes(Number(state.currentEstablishmentId)))return toast('Gardez l’accès à l’établissement actuellement ouvert');
     if(state.users.some(u=>normalizeLogin(u.username)===username&&(!editing||Number(u.id)!==id)))return toast('Cet identifiant existe déjà');
+    if(email&&state.users.some(u=>normalizeLogin(u.email)===email&&(!editing||Number(u.id)!==id)))return toast('Cette adresse e-mail est déjà utilisée par un autre compte');
     if(!editing&&pin.length<4)return toast('PIN minimum 4 caractères');
     if(editing){
       const u=state.users.find(v=>Number(v.id)===id);if(!u)return;
       if(u.role==='admin'&&role!=='admin'&&u.active!==false&&countActiveAdmins(id)<1)return toast('Il faut conserver au moins un administrateur actif');
-      Object.assign(u,{name,username,role,clientId,establishmentIds});if(pin){if(pin.length<4)return toast('PIN minimum 4 caractères');u.pin=pin}
+      Object.assign(u,{name,username,email,role,clientId,establishmentIds});if(pin){if(pin.length<4)return toast('PIN minimum 4 caractères');u.pin=pin}
       if(Number(state.user?.id)===id)state.user=userSnapshot(u);
-    }else state.users.push({id:state.nextUserId++,name,username,role,pin,active:true,clientId,establishmentIds});
+    }else state.users.push({id:state.nextUserId++,name,username,email,role,pin,active:true,clientId,establishmentIds});
     save();closeModal();renderPersonnel();applyRole();qs('#userBadge').textContent=`${state.user.name} · ${roleLabel(state.user.role)}`;toast(editing?'Utilisateur modifié':'Utilisateur créé');
   }
   if(e.target.classList.contains('editPersonnel')){const u=state.users.find(v=>Number(v.id)===Number(e.target.dataset.id));if(u)modal('Modifier utilisateur',personnelForm(u))}
@@ -1132,6 +1188,7 @@ document.addEventListener('click',e=>{
 qs('#modal').onclick=e=>{if(e.target.id==='modal')closeModal()};
 
 
+document.addEventListener('change',e=>{if(e.target?.id==='estClient'){const editId=Number(e.target.dataset.editEstId||0)||null;refreshEstablishmentAccessPicker(Number(e.target.value),editId)}});
 document.addEventListener('input',e=>{if(e.target?.id==='eAmount'||e.target?.id==='eVat')refreshExpensePreview()});
 function renderAll(){renderEstablishmentSwitcher();renderCash();renderTables();renderContext();renderCategories();renderProducts();renderCart();renderReservations();if(qs('#page-accounting')&&!qs('#page-accounting').classList.contains('hidden'))renderAccounting();if(qs('#page-invoices')&&!qs('#page-invoices').classList.contains('hidden'))renderInvoices()}
 load();

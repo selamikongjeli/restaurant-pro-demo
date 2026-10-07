@@ -1,3 +1,20 @@
+# Restaurant Pro v2.28 — Accès établissements, e-mail et changement de PIN
+
+## Nouveautés v2.28
+
+- Lorsqu’un établissement est créé, les **administrateurs actifs du même client reçoivent automatiquement l’accès**.
+- Le Super Admin peut choisir immédiatement quels **administrateurs, responsables et serveurs** auront accès à chaque établissement.
+- La modification d’un établissement permet aussi de modifier les accès du personnel.
+- Chaque établissement possède désormais un **e-mail obligatoire de contact / récupération PIN** lors de sa création ou modification.
+- Chaque utilisateur peut avoir sa propre **adresse e-mail** et peut aussi se connecter avec celle-ci.
+- Nouveau bouton **🔐 Mon PIN** : chaque utilisateur peut changer son PIN après avoir confirmé son PIN actuel.
+- Nouveau bouton **PIN oublié ?** sur la connexion : dans la démo GitHub Pages, il prépare une demande e-mail vers l’établissement afin que l’administrateur réinitialise le PIN.
+- Les anciens administrateurs sont migrés afin qu’ils voient automatiquement les établissements actifs de leur client, ce qui corrige le problème des établissements créés mais invisibles.
+
+> Sécurité : GitHub Pages ne peut pas envoyer un vrai code de réinitialisation par e-mail. Pour une récupération automatique avec code unique envoyé par e-mail, il faudra la version serveur (Node.js/PostgreSQL). La démo évite volontairement de permettre un changement de PIN uniquement avec une adresse e-mail.
+
+---
+
 # Restaurant Pro v2.27 — Clôture de journée
 
 ## Nouveautés v2.27

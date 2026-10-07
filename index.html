@@ -4,19 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
-<title>Restaurant Pro v2.27 — Clôture de journée</title>
+<title>Restaurant Pro v2.28 — Accès établissements & PIN</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=227">
+<link rel="stylesheet" href="style.css?v=228">
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
   <div class="login-card">
     <div class="brand big">Restaurant <span>Pro</span></div>
     <p>Démo GitHub Pages</p>
-    <input id="loginUser" placeholder="Nom ou identifiant" value="admin" autocomplete="username">
+    <input id="loginUser" placeholder="Nom, identifiant ou e-mail" value="admin" autocomplete="username">
     <input id="loginPin" type="password" inputmode="numeric" placeholder="PIN" value="3333" autocomplete="current-password">
     <button id="loginBtn" class="primary full">Connexion</button>
-    <div class="login-help">Chaque membre du personnel se connecte avec son identifiant et son PIN.</div>
+    <button id="forgotPinBtn" class="secondary full" type="button">PIN oublié ?</button>
+    <div class="login-help">Connexion par nom, identifiant ou e-mail + PIN.</div>
     <div class="demo-logins">Démo : admin / 3333 · manager / 2222 · serveur / 1111 · superadmin / 9999</div>
   </div>
 </div>
@@ -25,13 +26,14 @@
 <header class="topbar">
   <div>
     <div class="brand">Restaurant <span>Pro</span></div>
-    <div class="sub">v2.27 · Clôture de journée et comptabilité</div>
+    <div class="sub">v2.28 · Établissements, e-mail et changement PIN</div>
   </div>
   <div class="top-actions">
     <select id="establishmentSwitcher" class="establishment-switcher" title="Changer d’établissement"></select>
     <span id="licenseBadge" class="badge license-active">PRO · active</span>
     <span id="cashBadge" class="badge closed">Caisse fermée</span>
     <span id="userBadge" class="badge"></span>
+    <button id="changeOwnPinBtn" class="secondary compact-user-btn" title="Changer mon PIN">🔐 Mon PIN</button>
     <button id="changeUserBtn" class="secondary compact-user-btn" title="Changer d’utilisateur">⇄ Utilisateur</button>
     <button id="logoutBtn" class="icon" title="Déconnexion">⎋</button>
   </div>
@@ -237,7 +239,7 @@
   </div>
 
   <div class="settings-card personnel-settings-card">
-    <div class="section-title"><div><h2>👥 Personnel et accès</h2><div class="muted">Créez les comptes, attribuez les rôles et les PIN.</div></div><button id="addPersonnelBtn" class="primary">+ Ajouter un utilisateur</button></div>
+    <div class="section-title"><div><h2>👥 Personnel et accès</h2><div class="muted">Créez les comptes, attribuez les rôles, e-mails et PIN.</div></div><button id="addPersonnelBtn" class="primary">+ Ajouter un utilisateur</button></div>
     <div class="access-role-grid">
       <div><b>Serveur</b><span>Caisse + Réservations</span></div>
       <div><b>Responsable</b><span>Caisse, Réservations, Produits, Options cuisine, Stock, Rapports</span></div>
@@ -300,6 +302,6 @@
 </div>
 <button id="floatingReservationsBtn" class="floating-reservations">📅 Réservations</button>
 <div id="toast"></div>
-<script src="app.js?v=227"></script>
+<script src="app.js?v=228"></script>
 </body>
 </html>

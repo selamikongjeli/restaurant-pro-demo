@@ -347,3 +347,10 @@ main{padding:18px}
 @media(max-width:900px){.day-closure-row{grid-template-columns:1fr 1fr}.closure-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:560px){.day-closure-row,.closure-grid,.closure-summary{grid-template-columns:1fr}.closure-summary .closure-total{grid-column:auto}}
 @media print{body>*:not(#modal){display:none!important}#modal{position:static!important;background:#fff!important;padding:0!important}#modal .modal{box-shadow:none!important;max-width:none!important;width:100%!important}#modal .modal-head button,#printDayClosure{display:none!important}}
+
+/* v2.28 — accès établissements & PIN */
+.access-box-title{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}
+#estAccessUsers{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:6px}
+.recovery-note{padding:10px 12px;border-radius:10px;background:#f8fafc;border:1px solid var(--line)}
+#forgotPinBtn{margin-top:8px}
+@media(max-width:700px){#estAccessUsers{grid-template-columns:1fr}.compact-user-btn{padding:8px 10px}}
