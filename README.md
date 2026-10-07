@@ -1,3 +1,21 @@
+# Restaurant Pro v2.27 — Clôture de journée
+
+## Nouveautés v2.27
+
+- Nouveau bouton **Clôturer journée** accessible au responsable et à l’administrateur depuis la caisse.
+- Blocage de la clôture s’il reste des commandes/tables ouvertes.
+- Récapitulatif avant clôture : nombre de tickets, CA TVAC, carte, espèces, chèques-repas et TVA estimée.
+- Contrôle espèces : fond de caisse + ventes espèces - sorties espèces = **espèces attendues**.
+- Saisie du montant réellement compté et calcul automatique de l’**écart de caisse**.
+- La clôture ferme automatiquement la caisse si elle est encore ouverte.
+- Historique **Clôtures journalières** dans Comptabilité avec responsable, heure, CA, paiements et écart.
+- Détail d’une clôture avec ventilation TVA 6 / 12 / 21 % et bouton d’impression.
+- Une seule clôture finale par date et par établissement.
+
+> Il s’agit d’une clôture de gestion interne. Cette démo GitHub Pages n’est pas un SCE fiscal certifié.
+
+---
+
 # Restaurant Pro v2.26 — Comptabilité améliorée
 
 ## Nouveautés v2.26
