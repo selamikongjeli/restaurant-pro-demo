@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
-<title>Restaurant Pro v2.25 — Multi-clients et établissements</title>
+<title>Restaurant Pro v2.26 — Comptabilité améliorée</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=225">
+<link rel="stylesheet" href="style.css?v=226">
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
@@ -25,7 +25,7 @@
 <header class="topbar">
   <div>
     <div class="brand">Restaurant <span>Pro</span></div>
-    <div class="sub">v2.25 · Multi-clients, établissements et licences</div>
+    <div class="sub">v2.26 · Comptabilité et suivi de caisse</div>
   </div>
   <div class="top-actions">
     <select id="establishmentSwitcher" class="establishment-switcher" title="Changer d’établissement"></select>
@@ -201,11 +201,25 @@
 
 
 <section id="page-accounting" class="page hidden admin-only">
-  <div class="section-title"><div><h1>Comptabilité</h1><div class="muted">Pré-comptabilité de gestion — démonstration</div></div><div class="accounting-actions"><button id="newExpenseBtn" class="primary">+ Dépense</button><button id="newSupplierBtn" class="secondary">+ Fournisseur</button><button id="exportAccountingCsvBtn" class="secondary">Exporter CSV</button></div></div>
-  <div class="accounting-toolbar"><label>Période <select id="accountingPeriod"><option value="today">Aujourd’hui</option><option value="month" selected>Ce mois</option><option value="year">Cette année</option><option value="all">Tout</option></select></label></div>
-  <div id="accountingStats" class="big-stats"></div>
+  <div class="section-title"><div><h1>Comptabilité</h1><div class="muted">Pré-comptabilité, TVA, dépenses et contrôle de caisse</div></div><div class="accounting-actions"><button id="newExpenseBtn" class="primary">+ Dépense</button><button id="newSupplierBtn" class="secondary">+ Fournisseur</button><button id="exportAccountingCsvBtn" class="secondary">Exporter CSV</button></div></div>
+  <div class="accounting-toolbar accounting-toolbar-v226">
+    <label>Période<select id="accountingPeriod"><option value="today">Aujourd’hui</option><option value="month" selected>Ce mois</option><option value="year">Cette année</option><option value="custom">Dates personnalisées</option><option value="all">Tout</option></select></label>
+    <label id="accountingFromWrap" class="hidden">Du<input id="accountingFrom" type="date"></label>
+    <label id="accountingToWrap" class="hidden">Au<input id="accountingTo" type="date"></label>
+    <label>Catégorie<select id="accountingCategory"><option value="all">Toutes</option><option>Achats marchandises</option><option>Loyer</option><option>Salaires</option><option>Énergie</option><option>Assurances</option><option>Entretien</option><option>Marketing</option><option>Transport</option><option>Honoraires</option><option>Autre</option></select></label>
+    <label>Statut<select id="accountingExpenseStatus"><option value="all">Toutes dépenses</option><option value="paid">Payées</option><option value="unpaid">À payer</option></select></label>
+  </div>
+  <div id="accountingStats" class="big-stats accounting-stats"></div>
+  <div class="accounting-grid">
+    <section id="accountingRevenue" class="report-card"></section>
+    <section id="accountingPayments" class="report-card"></section>
+  </div>
+  <div class="accounting-grid">
+    <section id="accountingVat" class="report-card"></section>
+    <section id="accountingCategories" class="report-card"></section>
+  </div>
+  <section class="report-card accounting-full-card"><div class="section-title"><div><h2>Journal de caisse</h2><div class="muted">Ouvertures, fermetures et écarts</div></div></div><div id="cashSessionsList" class="admin-list"></div></section>
   <div class="accounting-grid"><section class="report-card"><div class="section-title"><h2>Dépenses</h2><span id="expenseCount" class="muted"></span></div><div id="expensesList" class="admin-list"></div></section><section class="report-card"><div class="section-title"><h2>Fournisseurs</h2><span id="supplierCount" class="muted"></span></div><div id="suppliersList" class="admin-list"></div></section></div>
-  <div class="accounting-grid"><section id="accountingVat" class="report-card"></section><section id="accountingCategories" class="report-card"></section></div>
 </section>
 <section id="page-invoices" class="page hidden admin-only">
   <div class="section-title"><div><h1>Facturation</h1><div class="muted">Factures de démonstration — non Peppol</div></div><button id="newInvoiceBtn" class="primary">+ Nouvelle facture</button></div>
@@ -257,7 +271,7 @@
 
 <section id="page-superadmin" class="page hidden superadmin-only">
   <div class="section-title"><div><h1>🏢 Super Admin Restaurant Pro</h1><div class="muted">Clients, établissements, formules et licences.</div></div><button id="addClientBtn" class="primary">+ Nouveau client</button></div>
-  <div class="commercial-warning">Cette console v2.25 simule l’administration commerciale dans le navigateur. Pour vendre en production, les comptes, licences et données devront être stockés et contrôlés sur le serveur.</div>
+  <div class="commercial-warning">Cette console simule l’administration commerciale dans le navigateur. Pour vendre en production, les comptes, licences et données devront être stockés et contrôlés sur le serveur.</div>
   <div id="saStats" class="big-stats"></div>
   <div id="clientsAdminList" class="sa-client-list"></div>
 </section>
@@ -284,6 +298,6 @@
 </div>
 <button id="floatingReservationsBtn" class="floating-reservations">📅 Réservations</button>
 <div id="toast"></div>
-<script src="app.js?v=225"></script>
+<script src="app.js?v=226"></script>
 </body>
 </html>

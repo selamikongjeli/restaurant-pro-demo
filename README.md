@@ -1,3 +1,21 @@
+# Restaurant Pro v2.26 — Comptabilité améliorée
+
+## Nouveautés v2.26
+
+- Tableau de bord comptable avec **CA TVAC, CA HT, dépenses TVAC/HT, résultat HT estimé et montant à payer**.
+- Filtres par période : aujourd’hui, mois, année, **dates personnalisées**, catégorie et statut des dépenses.
+- Détail des **moyens de paiement** : carte, espèces et chèques-repas.
+- Tableau TVA par taux **6 %, 12 % et 21 %** : base ventes HT, TVA ventes, TVA achats et solde estimé.
+- Dépenses enrichies : échéance, statut payée/à payer, numéro de facture/référence, fournisseur et aperçu HT/TVA/TVAC.
+- Détection visuelle des dépenses **à payer / en retard**.
+- Journal de caisse : fond d’ouverture, ventes espèces, sorties espèces, montant attendu, montant compté et **écart de caisse**.
+- Export CSV comptable enrichi avec HT, TVA, TVAC, référence, statut et moyen de paiement.
+- Toutes les données restent séparées par établissement comme en v2.25.
+
+> Les calculs comptables et TVA restent indicatifs dans cette démo GitHub Pages. Ils ne remplacent pas une comptabilité officielle ni une déclaration TVA.
+
+---
+
 # Restaurant Pro v2.25 — Multi-clients, multi-établissements et licences
 
 ## Nouveautés v2.25
