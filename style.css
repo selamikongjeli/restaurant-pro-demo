@@ -364,5 +364,5 @@ main{padding:18px}
 .sa-est-actions{flex-wrap:wrap}
 @media(max-width:700px){.nfc-config-actions{flex-direction:column}.sa-est-actions button{width:100%}}
 
-/* ===== v2.33 : Tickets X / Z ===== */
+/* ===== v2.34 : Tickets X / Z + recette serveur ===== */
 .x-report-warning{border-color:#bfdbfe;background:#eff6ff;color:#1e3a8a}.x-report-warning span{color:#1d4ed8}.pos-toolbar-actions #xReportBtn{white-space:nowrap;font-weight:900}

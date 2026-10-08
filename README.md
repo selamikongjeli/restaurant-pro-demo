@@ -1,3 +1,13 @@
+# Restaurant Pro v2.34 — Recette du jour accessible au serveur
+
+## Nouveautés v2.34
+
+- Le rôle **Serveur** peut maintenant ouvrir **💶 Recette du jour · Ticket X** depuis la caisse.
+- Le Ticket X reste **strictement en lecture seule** : il ne ferme rien et ne remet aucun compteur à zéro.
+- Le serveur voit le total en cours, les moyens de paiement, la TVA estimée et le détail par serveur / encaisseur.
+- Le **Ticket Z**, la fermeture de caisse et la clôture restent réservés au Responsable / Administrateur / Super Admin.
+- Après un Ticket Z, le Ticket X repart toujours à zéro pour le nouveau cycle.
+
 # Restaurant Pro v2.33 — Tickets X / Z
 
 ## Nouveautés v2.33
