@@ -363,3 +363,6 @@ main{padding:18px}
 .nfc-config-actions{display:flex;gap:8px;flex-wrap:wrap}.portal-info{margin:12px 0;padding:12px 14px;border:1px dashed #9ca3af;border-radius:12px;background:#fff}
 .sa-est-actions{flex-wrap:wrap}
 @media(max-width:700px){.nfc-config-actions{flex-direction:column}.sa-est-actions button{width:100%}}
+
+/* ===== v2.33 : Tickets X / Z ===== */
+.x-report-warning{border-color:#bfdbfe;background:#eff6ff;color:#1e3a8a}.x-report-warning span{color:#1d4ed8}.pos-toolbar-actions #xReportBtn{white-space:nowrap;font-weight:900}

@@ -1,3 +1,33 @@
+# Restaurant Pro v2.33 — Tickets X / Z
+
+## Nouveautés v2.33
+
+- Nouveau **Ticket X** : affiche à tout moment le résultat courant sans fermer ni remettre les compteurs à zéro.
+- Le Ticket X montre le **CA, nombre de tickets, carte, espèces, chèques-repas, TVA et le détail de chaque serveur / encaisseur**.
+- Le **Ticket Z** devient la vraie clôture de la période : il enregistre le total, ferme la caisse et démarre un nouveau cycle de compteurs.
+- Après un Ticket Z, le Ticket X repart à **zéro pour tous les serveurs**, tout en gardant les anciennes ventes dans l’historique et la comptabilité.
+- Le Ticket Z reçoit un **numéro séquentiel** (Z #0001, Z #0002, etc.) et garde la période de début/fin.
+- Après la clôture Z, **aucune vente ne peut être envoyée ou encaissée tant qu’une nouvelle caisse n’a pas été ouverte**.
+- L’ouverture de caisse reste possible pour le rôle Serveur ; les Tickets X/Z restent réservés au Responsable / Administrateur / Super Admin.
+- Les dépenses espèces du cycle sont rattachées à la clôture Z afin d’éviter qu’elles soient recomptées dans le cycle suivant.
+
+> Démo de gestion interne : le Ticket Z de cette version ne remplace pas une clôture fiscale certifiée SCE.
+
+---
+
+# Restaurant Pro v2.32 — Clôture par serveur / encaisseur
+
+## Nouveautés v2.32
+
+- La clôture de journée affiche maintenant **chaque serveur qui a encaissé** pendant la journée.
+- Pour chaque serveur : **nombre de tickets, carte, espèces, chèques-repas et total encaissé**.
+- Le serveur retenu est la personne connectée au moment du paiement, même si un autre serveur avait créé la commande.
+- Le détail est enregistré dans la clôture et reste visible dans **Comptabilité → Clôtures journalières → Voir détail**.
+- Les anciennes clôtures tentent de reconstruire le détail à partir des tickets encore présents dans la démo.
+- L’export CSV comptable contient aussi la colonne **Serveur / Encaisseur**.
+
+---
+
 # Restaurant Pro v2.31 — Ouverture caisse par serveur
 
 ## Nouveautés v2.31
