@@ -366,3 +366,15 @@ main{padding:18px}
 
 /* ===== v2.34 : Tickets X / Z + recette serveur ===== */
 .x-report-warning{border-color:#bfdbfe;background:#eff6ff;color:#1e3a8a}.x-report-warning span{color:#1d4ed8}.pos-toolbar-actions #xReportBtn{white-space:nowrap;font-weight:900}
+
+/* ===== v2.35 : préparation SCE 2.0 Belgique ===== */
+.sce-warning{background:#fff1f2!important;border-color:#fecdd3!important;color:#9f1239!important}
+.sce-form input,.sce-form select{width:100%;box-sizing:border-box}
+.sce-checklist{display:grid;gap:8px}
+.sce-check-row{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:#fff}
+.sce-check-row.ok{background:#f0fdf4;border-color:#bbf7d0}.sce-check-row.ko{background:#fff7ed;border-color:#fed7aa}
+.sce-check-row>span{font-size:18px}.sce-blocked-note{margin-top:12px;padding:12px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-weight:800;font-size:12px;line-height:1.45}
+.sce-obligations{display:grid;gap:8px;margin-top:10px}.sce-obligations>div{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#f8fafc;font-weight:700}
+.sce-event-row{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto}.json-preview{white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow:auto;background:#0f172a;color:#e2e8f0;padding:14px;border-radius:12px;font-size:11px;line-height:1.45}
+.ticket .ticket-meta{font-size:10px;line-height:1.4}
+@media(max-width:760px){.sce-event-row{grid-template-columns:1fr}.sce-event-row button{width:100%}}

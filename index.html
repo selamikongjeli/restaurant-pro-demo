@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
-<title>Restaurant Pro v2.34 — Recette du jour serveur</title>
+<title>Restaurant Pro v2.35 — Préparation SCE 2.0 Belgique</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="style.css?v=234">
+<link rel="stylesheet" href="style.css?v=235">
 </head>
 <body>
 <div id="loginScreen" class="login-screen">
@@ -29,7 +29,7 @@
 <header class="topbar">
   <div>
     <div class="brand">Restaurant <span>Pro</span></div>
-    <div class="sub">v2.34 · Recette du jour serveur</div>
+    <div class="sub">v2.35 · Préparation SCE 2.0 Belgique</div>
   </div>
   <div class="top-actions">
     <select id="establishmentSwitcher" class="establishment-switcher" title="Changer d’établissement"></select>
@@ -41,7 +41,7 @@
     <button id="logoutBtn" class="icon" title="Déconnexion">⎋</button>
   </div>
 </header>
-<div class="compliance-banner">Démo de gestion — non certifiée SCE / Peppol</div>
+<div class="compliance-banner sce-warning">⚠️ PRÉ-CERTIFICATION SCE 2.0 — démo non certifiée, FDM non connecté. Ne pas utiliser comme caisse fiscale en production.</div>
 
 <nav class="mainnav">
   <button class="navbtn active" data-page="pos">Caisse</button>
@@ -53,6 +53,7 @@
   <button class="navbtn admin-only" data-page="accounting">Comptabilité</button>
   <button class="navbtn admin-only" data-page="invoices">Facturation</button>
   <button class="navbtn admin-only" data-page="settings">Paramètres</button>
+  <button class="navbtn admin-only" data-page="sce">🛡️ SCE 2.0</button>
   <button class="navbtn superadmin-only" data-page="superadmin">🏢 Super Admin</button>
 </nav>
 
@@ -277,6 +278,45 @@
   </div>
 </section>
 
+<section id="page-sce" class="page hidden admin-only">
+  <div class="section-title"><div><h1>🛡️ Préparation SCE 2.0 — Belgique</h1><div class="muted">Préparation technique basée sur les spécifications SCE 2.0 publiées par le SPF Finances.</div></div><span id="sceTopStatus" class="badge license-suspended">NON CERTIFIÉ</span></div>
+  <div class="commercial-warning"><b>Important :</b> cette version prépare les données et les flux SCE 2.0, mais elle n’est pas un système de caisse certifié. Pour la vente comme SCE horeca, Restaurant Pro devra réussir la certification officielle et communiquer avec un FDM SCE 2.0 certifié.</div>
+  <div id="sceReadinessStats" class="big-stats"></div>
+  <div class="accounting-grid">
+    <section class="report-card">
+      <div class="section-title"><h2>Configuration fiscale</h2><span class="muted">par établissement</span></div>
+      <div class="form-grid sce-form">
+        <label class="span2">N° TVA établissement<input id="sceVatNo" placeholder="BE0123456789"></label>
+        <label>N° établissement SPF<input id="sceEstNo" placeholder="Numéro établissement"></label>
+        <label class="span2">POS ID certifié<input id="scePosId" maxlength="14" placeholder="Ex. CFOD0061234567"></label>
+        <label>Version logiciel<input id="scePosSwVersion" value="2.35.0"></label>
+        <label>Terminal ID<input id="sceTerminalId" placeholder="POS-1"></label>
+        <label>Device ID<input id="sceDeviceId" placeholder="PC-CAISSE-1"></label>
+        <label>Média ticket<select id="sceTicketMedium"><option value="PAPER">Papier</option><option value="DIGITAL">Numérique</option><option value="PAPER_DIGITAL">Papier + numérique</option><option value="NONE">Aucune impression</option></select></label>
+        <label class="span2">Adresse locale FDM / GraphQL<input id="sceFdmUrl" placeholder="https://fdm.local/graphql"></label>
+        <label>Certificat POS<input id="scePosCertificateNo" placeholder="Après certification"></label>
+        <label>Certificat FDM<input id="sceFdmCertificateNo" placeholder="Ex. BMC07"></label>
+        <label>Arrondi espèces<select id="sceCashRounding"><option value="1">Obligatoire — 0,05 €</option><option value="0">Désactivé (non conforme pour espèces)</option></select></label>
+        <label>Arrondir aussi les autres paiements<select id="sceRoundAllPayments"><option value="0">Non</option><option value="1">Oui</option></select></label>
+        <button id="saveSceSettingsBtn" class="primary span3">Enregistrer la configuration SCE</button>
+      </div>
+    </section>
+    <section class="report-card">
+      <div class="section-title"><h2>État pré-certification</h2><span id="sceChecklistCount" class="muted"></span></div>
+      <div id="sceChecklist" class="sce-checklist"></div>
+      <div class="sce-blocked-note">🔒 Le mode fiscal de production reste volontairement bloqué tant qu’un FDM réel et la certification SPF ne sont pas intégrés.</div>
+    </section>
+  </div>
+  <section class="report-card accounting-full-card">
+    <div class="section-title"><div><h2>Journal d’événements SCE — simulation</h2><div class="muted">P / N / F / R enregistrés avec compteur continu. Aucun événement n’est signé par un FDM dans cette démo.</div></div><div class="personnel-actions"><button id="previewScePayloadBtn" class="secondary">Voir dernier payload</button><button id="exportFiscalJournalBtn" class="primary">Exporter JSON</button></div></div>
+    <div id="sceEventJournal" class="admin-list"></div>
+  </section>
+  <section class="report-card accounting-full-card">
+    <h2>Points encore obligatoires avant commercialisation comme SCE certifié</h2>
+    <div class="sce-obligations"><div>1. Intégration réelle POS ↔ FDM via HTTP(S) / GraphQL.</div><div>2. Blocage de toute vente finale si le FDM n’est pas connecté et opérationnel.</div><div>3. Signature FDM, QR de vérification et données de contrôle sur le ticket TVA.</div><div>4. Stockage serveur sécurisé et conservation des JSON originaux + réponses FDM.</div><div>5. Dossier et tests de certification auprès du SPF Finances.</div><div>6. Facturation B2B structurée via Peppol pour les factures concernées.</div><div>7. Conserver la chronologie brute des lignes/corrections envoyées au FDM, sans consolidation du message fiscal.</div></div>
+  </section>
+</section>
+
 <section id="page-superadmin" class="page hidden superadmin-only">
   <div class="section-title"><div><h1>🏢 Super Admin Restaurant Pro</h1><div class="muted">Clients, établissements, formules et licences.</div></div><button id="addClientBtn" class="primary">+ Nouveau client</button></div>
   <div class="commercial-warning">Cette console simule l’administration commerciale dans le navigateur. Pour vendre en production, les comptes, licences et données devront être stockés et contrôlés sur le serveur.</div>
@@ -307,6 +347,6 @@
 </div>
 <button id="floatingReservationsBtn" class="floating-reservations">📅 Réservations</button>
 <div id="toast"></div>
-<script src="app.js?v=234"></script>
+<script src="app.js?v=235"></script>
 </body>
 </html>

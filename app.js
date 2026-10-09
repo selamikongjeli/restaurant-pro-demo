@@ -10,10 +10,10 @@ let pendingProductConfig=null;
 const defaults={
   user:null,migrationV228AccessDone:false,migrationV229PrimaryAdminDone:false,
   users:[
-    {id:1,username:'admin',name:'Administrateur',email:'',pin:'3333',nfcCode:'DEMO-ADMIN-001',role:'admin',active:true,clientId:1,establishmentIds:[1]},
-    {id:2,username:'manager',name:'Responsable',email:'',pin:'2222',nfcCode:'DEMO-MANAGER-002',role:'manager',active:true,clientId:1,establishmentIds:[1]},
-    {id:3,username:'serveur',name:'Serveur',email:'',pin:'1111',nfcCode:'DEMO-SERVEUR-003',role:'server',active:true,clientId:1,establishmentIds:[1]},
-    {id:4,username:'superadmin',name:'Super Admin Restaurant Pro',email:'',pin:'9999',nfcCode:'DEMO-SUPER-004',role:'superadmin',active:true,clientId:null,establishmentIds:[]}
+    {id:1,username:'admin',name:'Administrateur',email:'',niss:'',pin:'3333',nfcCode:'DEMO-ADMIN-001',role:'admin',active:true,clientId:1,establishmentIds:[1]},
+    {id:2,username:'manager',name:'Responsable',email:'',niss:'',pin:'2222',nfcCode:'DEMO-MANAGER-002',role:'manager',active:true,clientId:1,establishmentIds:[1]},
+    {id:3,username:'serveur',name:'Serveur',email:'',niss:'',pin:'1111',nfcCode:'DEMO-SERVEUR-003',role:'server',active:true,clientId:1,establishmentIds:[1]},
+    {id:4,username:'superadmin',name:'Super Admin Restaurant Pro',email:'',niss:'',pin:'9999',nfcCode:'DEMO-SUPER-004',role:'superadmin',active:true,clientId:null,establishmentIds:[]}
   ],nextUserId:5,
   clients:[{id:1,name:'Client démo',companyName:'Restaurant Pro Démo',vatNumber:'',email:'',phone:'',active:true}],nextClientId:2,
   establishments:[{id:1,clientId:1,name:'Restaurant Pro',address:'',phone:'',email:'',primaryAdminUserId:1,plan:'pro',licenseStatus:'active',licenseEnd:'',active:true}],nextEstablishmentId:2,currentEstablishmentId:1,establishmentData:{},
@@ -39,6 +39,7 @@ const defaults={
     {id:12,cat:'Boissons',name:'Verre de vin',price:5,vat:21,station:'Bar',stock:50,low:8}
   ],
   cart:[],openOrders:{},payments:[],reservations:[],nextReservationId:1,nextProductId:13,
+  fiscalEvents:[],fiscalCounters:{},nextFiscalTicketNo:1,bookingPeriodId:'',fiscalBookingDate:'',
   expenses:[],suppliers:[],invoices:[],cashSessions:[],dayClosures:[],nextExpenseId:1,nextSupplierId:1,nextInvoiceId:1,nextCashSessionId:1,nextDayClosureId:1,
   accompanimentGroups:[{id:1,name:'Accompagnements classiques',items:['Frites','Croquettes','Purée','Pommes vapeur','Salade','Légumes','Riz']}],
   kitchenMessages:['Sans salade','Sans frites','Sans sauce','Sauce à part','Bien chaud','Allergie'],
@@ -49,21 +50,22 @@ const defaults={
     reservationsEnabled:true,maxReservationsPerDay:60,maxCoversPerDay:120,maxPartySize:20,minLeadMinutes:120,
     maxAdvanceDays:90,slotIntervalMinutes:30,defaultDurationMinutes:120,lunchEnabled:true,lunchStart:'12:00',lunchEnd:'14:30',
     dinnerEnabled:true,dinnerStart:'18:00',dinnerEnd:'22:00',enforceServiceHours:true,phoneRequired:true,
-    allowUnassignedTable:true,staffCanOverrideLimits:true,autoLockMinutes:10
+    allowUnassignedTable:true,staffCanOverrideLimits:true,autoLockMinutes:10,
+    sceMode:'precert',sceVatNo:'',sceEstNo:'',scePosId:'',scePosSwVersion:'2.35.0',sceTerminalId:'POS-1',sceDeviceId:'WEB-1',sceTicketMedium:'PAPER',sceFdmUrl:'',scePosCertificateNo:'',sceFdmCertificateNo:'',sceCashRounding:true,sceRoundAllPayments:false
   }
 };
 let state=structuredClone(defaults);
 
 // ===== v2.25 : multi-clients / multi-établissements =====
 const ESTABLISHMENT_FIELDS=[
-  'cashOpen','cashOpening','currentMode','tableId','category','sent','dirty','payment','rooms','nextRoomId','nextTableId','posRoomId','settingsRoomId','tables','products','cart','openOrders','payments','reservations','nextReservationId','nextProductId','expenses','suppliers','invoices','cashSessions','dayClosures','nextExpenseId','nextSupplierId','nextInvoiceId','nextCashSessionId','nextDayClosureId','accompanimentGroups','kitchenMessages','nextAccompanimentGroupId','reservationDate','reservationSearch','reservationStatusFilter','settings'
+  'cashOpen','cashOpening','currentMode','tableId','category','sent','dirty','payment','rooms','nextRoomId','nextTableId','posRoomId','settingsRoomId','tables','products','cart','openOrders','payments','reservations','nextReservationId','nextProductId','fiscalEvents','fiscalCounters','nextFiscalTicketNo','bookingPeriodId','fiscalBookingDate','expenses','suppliers','invoices','cashSessions','dayClosures','nextExpenseId','nextSupplierId','nextInvoiceId','nextCashSessionId','nextDayClosureId','accompanimentGroups','kitchenMessages','nextAccompanimentGroupId','reservationDate','reservationSearch','reservationStatusFilter','settings'
 ];
 function establishmentSnapshotFrom(source){
   const out={};ESTABLISHMENT_FIELDS.forEach(k=>out[k]=structuredClone(source[k]));return out;
 }
 function freshEstablishmentData(name='Nouvel établissement'){
   const out=establishmentSnapshotFrom(defaults);
-  out.settings={...out.settings,establishmentName:name};out.cashOpen=false;out.cashOpening=0;out.tableId=null;out.cart=[];out.openOrders={};out.payments=[];out.reservations=[];out.expenses=[];out.suppliers=[];out.invoices=[];out.cashSessions=[];out.dayClosures=[];out.nextDayClosureId=1;return out;
+  out.settings={...out.settings,establishmentName:name};out.cashOpen=false;out.cashOpening=0;out.tableId=null;out.cart=[];out.openOrders={};out.payments=[];out.reservations=[];out.fiscalEvents=[];out.fiscalCounters={};out.nextFiscalTicketNo=1;out.bookingPeriodId='';out.fiscalBookingDate='';out.expenses=[];out.suppliers=[];out.invoices=[];out.cashSessions=[];out.dayClosures=[];out.nextDayClosureId=1;return out;
 }
 function currentEstablishment(){return state.establishments?.find(e=>Number(e.id)===Number(state.currentEstablishmentId))||null}
 function currentClient(){const e=currentEstablishment();return state.clients?.find(c=>Number(c.id)===Number(e?.clientId))||null}
@@ -103,6 +105,7 @@ function applyEstablishmentData(id){
   state.settings={...defaults.settings,...(state.settings||{}),establishmentName:est.name||state.settings?.establishmentName||'Restaurant Pro'};return true;
 }
 function normalizeOperationalData(){
+  state.fiscalEvents=Array.isArray(state.fiscalEvents)?state.fiscalEvents:[];state.fiscalCounters=state.fiscalCounters&&typeof state.fiscalCounters==='object'?state.fiscalCounters:{};state.nextFiscalTicketNo=Math.max(1,Number(state.nextFiscalTicketNo||1));state.bookingPeriodId=String(state.bookingPeriodId||'');state.fiscalBookingDate=String(state.fiscalBookingDate||'');
   state.products=(state.products||[]).map(p=>({...p,askCooking:p.askCooking!==undefined?Boolean(p.askCooking):productNeedsCooking(p),askSauce:p.askSauce!==undefined?Boolean(p.askSauce):productNeedsSauce(p),accompanimentGroupId:p.accompanimentGroupId!==undefined?p.accompanimentGroupId:(p.cat==='Plats'?1:null),allowKitchenMessage:p.allowKitchenMessage!==undefined?Boolean(p.allowKitchenMessage):true}));
   state.accompanimentGroups=Array.isArray(state.accompanimentGroups)&&state.accompanimentGroups.length?state.accompanimentGroups:structuredClone(defaults.accompanimentGroups);
   state.kitchenMessages=Array.isArray(state.kitchenMessages)&&state.kitchenMessages.length?state.kitchenMessages:[...defaults.kitchenMessages];
@@ -133,7 +136,7 @@ function switchEstablishment(id){
 
 function userSnapshot(u){
   if(!u)return null;
-  return {id:Number(u.id||0),username:String(u.username||''),name:String(u.name||''),email:String(u.email||''),nfcCode:String(u.nfcCode||''),role:String(u.role||'server'),clientId:u.clientId==null?null:Number(u.clientId),establishmentIds:Array.isArray(u.establishmentIds)?u.establishmentIds.map(Number):[]};
+  return {id:Number(u.id||0),username:String(u.username||''),name:String(u.name||''),email:String(u.email||''),niss:String(u.niss||''),nfcCode:String(u.nfcCode||''),role:String(u.role||'server'),clientId:u.clientId==null?null:Number(u.clientId),establishmentIds:Array.isArray(u.establishmentIds)?u.establishmentIds.map(Number):[]};
 }
 function save(){
   syncCurrentEstablishmentData();
@@ -167,11 +170,11 @@ function load(){
     state.users=Array.isArray(state.users)&&state.users.length?state.users:structuredClone(defaults.users);
     state.users=state.users.map((u,index)=>({
       id:Number(u.id||index+1),username:String(u.username||u.name||('user'+(index+1))).trim().toLowerCase(),
-      name:String(u.name||u.username||('Utilisateur '+(index+1))).trim(),email:String(u.email||'').trim().toLowerCase(),pin:String(u.pin||''),nfcCode:String(u.nfcCode||`RP-${String(Number(u.id||index+1)).padStart(4,'0')}`).trim().toUpperCase(),
+      name:String(u.name||u.username||('Utilisateur '+(index+1))).trim(),email:String(u.email||'').trim().toLowerCase(),niss:String(u.niss||'').replace(/\D/g,'').slice(0,11),pin:String(u.pin||''),nfcCode:String(u.nfcCode||`RP-${String(Number(u.id||index+1)).padStart(4,'0')}`).trim().toUpperCase(),
       role:['superadmin','admin','manager','server'].includes(u.role)?u.role:'server',active:u.active!==false,
       clientId:u.role==='superadmin'?null:Number(u.clientId||1),establishmentIds:u.role==='superadmin'?[]:(Array.isArray(u.establishmentIds)&&u.establishmentIds.length?u.establishmentIds.map(Number):[1])
     }));
-    if(!state.users.some(u=>u.role==='superadmin'))state.users.push({id:Math.max(4,...state.users.map(u=>Number(u.id)||0))+1,username:'superadmin',name:'Super Admin Restaurant Pro',email:'',pin:'9999',nfcCode:'DEMO-SUPER-004',role:'superadmin',active:true,clientId:null,establishmentIds:[]});
+    if(!state.users.some(u=>u.role==='superadmin'))state.users.push({id:Math.max(4,...state.users.map(u=>Number(u.id)||0))+1,username:'superadmin',name:'Super Admin Restaurant Pro',email:'',niss:'',pin:'9999',nfcCode:'DEMO-SUPER-004',role:'superadmin',active:true,clientId:null,establishmentIds:[]});
     state.nextUserId=Math.max(Number(state.nextUserId||0)-1,...state.users.map(u=>Number(u.id)||0),0)+1;
     // v2.25 — migration commerciale : client, établissements et jeux de données séparés
     state.clients=Array.isArray(state.clients)&&state.clients.length?state.clients:structuredClone(defaults.clients);
@@ -227,6 +230,19 @@ function modal(title,html){qs('#modalTitle').textContent=title;qs('#modalBody').
 function closeModal(){qs('#modal').classList.add('hidden')}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
 function localDateISO(d=new Date()){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function localRfc3339(d=new Date()){
+  const pad=n=>String(n).padStart(2,'0'),ms=String(d.getMilliseconds()).padStart(3,'0');
+  const off=-d.getTimezoneOffset(),sign=off>=0?'+':'-',oh=pad(Math.floor(Math.abs(off)/60)),om=pad(Math.abs(off)%60);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${ms}${sign}${oh}:${om}`;
+}
+function normalizeNiss(v){return String(v||'').replace(/\D/g,'').slice(0,11)}
+function validNiss(v){return /^\d{11}$/.test(normalizeNiss(v))}
+function makeUuid(){try{return crypto.randomUUID()}catch{return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0,v=c==='x'?r:(r&3|8);return v.toString(16)})}}
+function vatLabelFromRate(rate){return Number(rate)===21?'A':Number(rate)===12?'B':Number(rate)===6?'C':Number(rate)===0?'D':'X'}
+function paymentTypeFor(method){return method==='cash'?'CASH':method==='meal'?'CHEQUE_MEAL':'CARD_UNKNOWN'}
+function roundTo005(amount){return Math.round((Number(amount||0)+Number.EPSILON)*20)/20}
+function cashRoundingFor(amount){const n=Number(amount||0);if(n>0&&n<0.05)return 0;const rounded=roundTo005(n);return Number((rounded-n).toFixed(2))}
+function effectivePaidAmount(p){return Number(p?.paidTotal??p?.total??0)}
 function shiftDate(date,days){const d=new Date(`${date}T12:00:00`);d.setDate(d.getDate()+days);return localDateISO(d)}
 function timeToMinutes(v){const [h,m]=String(v||'00:00').split(':').map(Number);return (h||0)*60+(m||0)}
 function isSuperAdmin(){return state.user?.role==='superadmin'}
@@ -366,6 +382,7 @@ function setPage(name){
   if(name==='accounting')renderAccounting();
   if(name==='invoices')renderInvoices();
   if(name==='settings')renderSettings();
+  if(name==='sce')renderSce();
   if(name==='superadmin')renderSuperAdmin();
   window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -382,7 +399,7 @@ function renderCash(){
   renderCart();
 }
 qs('#openCashBtn').onclick=()=>modal('Ouvrir la caisse',`<div class="form-grid"><label class="span3">Fond de caisse<input id="cashOpenAmount" type="number" step="0.01" value="100"></label><button id="confirmOpenCash" class="primary span3">Ouvrir</button></div>`);
-qs('#xReportBtn').onclick=()=>{if(!state.user)return toast('Connexion requise');openXReportModal()};
+qs('#xReportBtn').onclick=()=>{if(!state.user)return toast('Connexion requise');const x=dayClosurePreview();recordFiscalEvent('R','signReportTurnoverX',{turnover:{ticketCount:x.payments.length,grossSales:Number(x.ca.toFixed(2)),payments:{...x.pm},vat:x.vat}},{note:'Ticket X simulé — aucune signature FDM'});recordFiscalEvent('R','signReportUserX',{users:x.cashiers.map(u=>({employeeId:(state.users.find(a=>Number(a.id)===Number(u.userId))?.niss||null),displayName:u.name,ticketCount:u.ticketCount,turnover:Number(u.total.toFixed(2))}))},{note:'Rapport utilisateurs X simulé'});save();openXReportModal()};
 qs('#closeCashBtn').onclick=()=>{if(!isManager())return toast('Fermeture de caisse réservée au responsable / administrateur');modal('Fermer la caisse',cashCloseForm())};
 qs('#closeDayBtn').onclick=()=>{if(!isManager())return toast('Ticket Z réservé au responsable / administrateur');openDayClosureModal()};
 
@@ -390,7 +407,7 @@ function currentOpenCashSession(){return [...(state.cashSessions||[])].reverse()
 function cashSessionTotals(session=currentOpenCashSession()){
   const start=session?.openedAt?new Date(session.openedAt).getTime():0,now=Date.now();
   const payments=(state.payments||[]).filter(p=>{const t=new Date(p.date).getTime();return t>=start&&t<=now});
-  const cashSales=payments.filter(p=>p.method==='cash').reduce((s,p)=>s+Number(p.total||0),0);
+  const cashSales=payments.filter(p=>p.method==='cash').reduce((s,p)=>s+effectivePaidAmount(p),0);
   const cashExpenses=(state.expenses||[]).filter(x=>(x.status||'paid')==='paid'&&x.method==='Espèces'&&new Date(`${x.date}T23:59:59`).getTime()>=start).reduce((s,x)=>s+Number(x.amount||0),0);
   const expected=Number(session?.opening||0)+cashSales-cashExpenses;
   return{payments,cashSales,cashExpenses,expected};
@@ -418,8 +435,8 @@ function cashierBreakdown(payments=[]){
     const u=p.servedBy||p.cashier||null;
     const key=u?.id?`id:${u.id}`:`name:${String(u?.name||u?.username||'Non identifié').toLowerCase()}`;
     if(!byCashier.has(key))byCashier.set(key,{userId:Number(u?.id||0)||null,name:u?.name||u?.username||'Non identifié',username:u?.username||'',role:u?.role||'',ticketCount:0,total:0,card:0,cash:0,meal:0});
-    const row=byCashier.get(key),amount=Number(p.total||0),method=String(p.method||'');
-    row.ticketCount++;row.total+=amount;if(['card','cash','meal'].includes(method))row[method]+=amount;
+    const row=byCashier.get(key),amount=Number(p.total||0),method=String(p.method||''),methodAmount=method==='cash'?effectivePaidAmount(p):amount;
+    row.ticketCount++;row.total+=amount;if(['card','cash','meal'].includes(method))row[method]+=methodAmount;
   });
   return [...byCashier.values()].sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name,'fr'));
 }
@@ -434,10 +451,10 @@ function closureCashiers(c){
   return cashierBreakdown(payments);
 }
 function dayClosurePreview(){
-  const payments=currentCyclePayments(),pm={card:0,cash:0,meal:0};payments.forEach(p=>pm[p.method]=(pm[p.method]||0)+Number(p.total||0));
+  const payments=currentCyclePayments(),pm={card:0,cash:0,meal:0},roundingTotal=payments.reduce((a,p)=>a+Number(p.rounding||0),0);payments.forEach(p=>pm[p.method]=(pm[p.method]||0)+(p.method==='cash'?effectivePaidAmount(p):Number(p.total||0)));
   const ca=payments.reduce((sum,p)=>sum+Number(p.total||0),0),vat=salesVatBreakdown(payments),vatTotal=Object.values(vat).reduce((sum,x)=>sum+x.vat,0),cashiers=cashierBreakdown(payments);
   const openSession=currentOpenCashSession(),opening=Number(openSession?.opening||0),cashExpenseRows=currentCycleCashExpenses(),cashExpenses=cashExpenseRows.reduce((sum,x)=>sum+Number(x.amount||0),0),expectedCash=opening+pm.cash-cashExpenses;
-  return{payments,pm,ca,vat,vatTotal,cashiers,openSession,opening,cashExpenses,cashExpenseRows,expectedCash,periodStart:currentZCycleStart()};
+  return{payments,pm,ca,vat,vatTotal,cashiers,openSession,opening,cashExpenses,cashExpenseRows,expectedCash,roundingTotal,periodStart:currentZCycleStart()};
 }
 function xReportHtml(x=dayClosurePreview()){
   const from=x.periodStart?new Date(x.periodStart).toLocaleString('fr-BE'):'Début des données',now=new Date().toLocaleString('fr-BE');
@@ -774,6 +791,9 @@ qs('#sendOrderBtn').onclick=()=>{
     const previous=state.openOrders[state.tableId]||{},staff=userSnapshot(state.user);
     state.openOrders[state.tableId]={...previous,items:structuredClone(state.cart),sentAt:new Date().toISOString(),openedAt:previous.openedAt||new Date().toISOString(),createdBy:previous.createdBy||staff,lastHandledBy:staff,serverName:staff?.name||'—'};
   }
+  const orderReference=state.currentMode==='table'&&state.tableId?`TABLE-${state.tableId}`:`${String(state.currentMode||'DIRECT').toUpperCase()}-${Date.now()}`;
+  const costCenter=state.currentMode==='table'&&state.tableId?{id:String(state.tableId),type:'TABLE',reference:state.tables.find(t=>Number(t.id)===Number(state.tableId))?.name||`Table ${state.tableId}`}:{id:String(state.currentMode||'DIRECT').toUpperCase(),type:'OTHER',reference:state.currentMode==='takeaway'?'Emporter':'Livraison'};
+  recordFiscalEvent('P','signOrder',{reference:orderReference,costCenter,transaction:fiscalTransactionFromItems(state.cart)},{note:'Commande / vente interrompue simulée — doit être transmise au FDM en production'});
   state.sent=true;state.dirty=false;save();renderTables();renderCart();
   const groups=ticketGroupsByStation(state.cart);
 
@@ -804,10 +824,15 @@ qs('#payBtn').onclick=()=>{
   const total=state.cart.reduce((s,i)=>s+i.price*i.qty,0),vat={6:0,12:0,21:0};
   state.cart.forEach(i=>{const t=i.price*i.qty;vat[i.vat]+=t-t/(1+i.vat/100);const p=state.products.find(p=>p.id===i.id);if(p)p.stock=Math.max(0,p.stock-i.qty)});
   const servedBy=userSnapshot(state.user),orderOwner=state.tableId?state.openOrders[state.tableId]?.createdBy:null;
-  state.payments.push({id:Date.now(),date:new Date().toISOString(),total,method:state.payment,vat,items:structuredClone(state.cart),servedBy,orderOwner:orderOwner||servedBy,tableId:state.tableId||null,mode:state.currentMode});
+  const shouldRound=state.payment==='cash'?state.settings.sceCashRounding!==false:(state.payment!=='meal'&&Boolean(state.settings.sceRoundAllPayments));
+  const rounding=shouldRound?cashRoundingFor(total):0,paidTotal=Number((total+rounding).toFixed(2));
+  const fiscalEvent=recordFiscalEvent('N','signSale',{transaction:fiscalTransactionFromItems(state.cart),financials:fiscalFinancialLines(state.payment,total,rounding)},{note:'Vente finale simulée — en production elle ne peut être finalisée qu’après signature du FDM'});
+  state.payments.push({id:Date.now(),date:new Date().toISOString(),total,paidTotal,rounding,method:state.payment,vat,items:structuredClone(state.cart),servedBy,orderOwner:orderOwner||servedBy,tableId:state.tableId||null,mode:state.currentMode,fiscalEventId:fiscalEvent.id,fiscalStatus:'SIMULATED_UNSIGNED'});
   if(state.tableId)delete state.openOrders[state.tableId];
-  const receipt=`<div class="ticket"><div style="text-align:center"><b>${esc(state.settings.establishmentName)}</b><br>Ticket démo<br><span class="ticket-meta">Serveur : ${esc(orderOwner?.name||servedBy?.name||'—')}${orderOwner?.name&&servedBy?.name&&orderOwner.name!==servedBy.name?' · Encaissement : '+esc(servedBy.name):''}</span></div><hr>${state.cart.map(i=>`<div style="display:flex;justify-content:space-between"><span>${i.qty} × ${esc(i.name)}</span><b>${money(i.qty*i.price)}</b></div>`).join('')}<hr><div style="display:flex;justify-content:space-between;font-size:18px"><b>TOTAL</b><b>${money(total)}</b></div><hr>${[6,12,21].filter(r=>vat[r]>0).map(r=>`TVA ${r}% : ${money(vat[r])}<br>`).join('')}</div>`;
-  state.cart=[];state.sent=false;state.dirty=false;state.tableId=null;save();renderAll();modal('Ticket client',receipt)
+  const roundingLine=Math.abs(rounding)>=0.005?`<div style="display:flex;justify-content:space-between"><span>Arrondi paiement</span><b>${money(rounding)}</b></div>`:'';
+  const paidLine=Math.abs(paidTotal-total)>=0.005?`<div style="display:flex;justify-content:space-between;font-size:18px"><b>À PAYER</b><b>${money(paidTotal)}</b></div>`:'';
+  const receipt=`<div class="ticket"><div style="text-align:center"><b>${esc(state.settings.establishmentName)}</b><br><b>TICKET DÉMO — NON FISCAL</b><br><span class="ticket-meta">Serveur : ${esc(orderOwner?.name||servedBy?.name||'—')}${orderOwner?.name&&servedBy?.name&&orderOwner.name!==servedBy.name?' · Encaissement : '+esc(servedBy.name):''}</span></div><hr>${state.cart.map(i=>`<div style="display:flex;justify-content:space-between"><span>${i.qty} × ${esc(i.name)}</span><b>${money(i.qty*i.price)}</b></div>`).join('')}<hr><div style="display:flex;justify-content:space-between;font-size:18px"><b>TOTAL TVAC</b><b>${money(total)}</b></div>${roundingLine}${paidLine}<hr>${[6,12,21].filter(r=>vat[r]>0).map(r=>`TVA ${r}% : ${money(vat[r])}<br>`).join('')}<hr><div class="ticket-meta">SCE 2.0 simulation · Event N #${fiscalEvent.labelCounter} · POS ticket ${fiscalEvent.posFiscalTicketNo}<br>FDM : NON CONNECTÉ · Signature : ABSENTE<br><b>CECI N’EST PAS UN TICKET DE CAISSE TVA VALABLE.</b></div></div>`;
+  state.cart=[];state.sent=false;state.dirty=false;state.tableId=null;save();renderAll();modal('Ticket client — démo non fiscale',receipt)
 };
 
 function validateReservation(x,editingId=null){
@@ -918,7 +943,7 @@ function renderReports(){
   const total=state.payments.reduce((s,p)=>s+p.total,0),today=localDateISO(),todayPays=state.payments.filter(p=>p.date.slice(0,10)===today),todayTotal=todayPays.reduce((s,p)=>s+p.total,0);
   qs('#reportStats').innerHTML=`<div class="stat"><span>CA total démo</span><b>${money(total)}</b></div><div class="stat"><span>CA aujourd’hui</span><b>${money(todayTotal)}</b></div><div class="stat"><span>Paiements</span><b>${state.payments.length}</b></div><div class="stat"><span>Commandes ouvertes</span><b>${Object.keys(state.openOrders).length}</b></div><div class="stat"><span>Réservations</span><b>${state.reservations.length}</b></div>`;
   const vat={6:0,12:0,21:0};state.payments.forEach(p=>[6,12,21].forEach(v=>vat[v]+=Number(p.vat?.[v]||0)));qs('#vatReport').innerHTML=`<h3>TVA</h3>${[6,12,21].map(v=>`TVA ${v}% : <b>${money(vat[v])}</b><br>`).join('')}`;
-  const pm={card:0,cash:0,meal:0};state.payments.forEach(p=>pm[p.method]=(pm[p.method]||0)+p.total);qs('#paymentsReport').innerHTML=`<h3>Moyens de paiement</h3>Carte : <b>${money(pm.card)}</b><br>Espèces : <b>${money(pm.cash)}</b><br>Chèque-repas : <b>${money(pm.meal)}</b>`;
+  const pm={card:0,cash:0,meal:0};state.payments.forEach(p=>pm[p.method]=(pm[p.method]||0)+(p.method==='cash'?effectivePaidAmount(p):Number(p.total||0)));qs('#paymentsReport').innerHTML=`<h3>Moyens de paiement</h3>Carte : <b>${money(pm.card)}</b><br>Espèces : <b>${money(pm.cash)}</b><br>Chèque-repas : <b>${money(pm.meal)}</b>`;
   const byStaff={};state.payments.forEach(p=>{const name=p.orderOwner?.name||p.servedBy?.name||'Ancienne vente / non attribuée';byStaff[name]=byStaff[name]||{count:0,total:0};byStaff[name].count++;byStaff[name].total+=Number(p.total||0)});
   qs('#staffSalesReport').innerHTML=Object.entries(byStaff).sort((a,b)=>b[1].total-a[1].total).map(([name,v])=>`<div class="admin-row sales-row"><div><b>${esc(name)}</b></div><div>${v.count} vente(s)</div><div><b>${money(v.total)}</b></div><div></div></div>`).join('')||'<div class="empty">Aucune vente</div>';
   qs('#recentSalesReport').innerHTML=[...state.payments].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,20).map(p=>{const orderStaff=p.orderOwner?.name||p.servedBy?.name||'Non attribuée',cashier=p.servedBy?.name||orderStaff,table=p.tableId?state.tables.find(t=>Number(t.id)===Number(p.tableId))?.name:'',mode=p.mode==='takeaway'?'Emporter':p.mode==='delivery'?'Livraison':(table||'Salle');return `<div class="admin-row sales-row"><div><b>${new Date(p.date).toLocaleString('fr-BE')}</b><div class="muted">${esc(mode)}</div></div><div>👤 ${esc(orderStaff)}${cashier!==orderStaff?`<div class="muted">Encaissement : ${esc(cashier)}</div>`:''}</div><div><b>${money(p.total)}</b></div><div>${esc(p.method==='cash'?'Espèces':p.method==='meal'?'Chèque-repas':'Carte')}</div></div>`}).join('')||'<div class="empty">Aucune vente</div>';
@@ -944,7 +969,7 @@ function renderAccounting(){
   const expenseTtc=expenses.reduce((a,e)=>a+Number(e.amount||0),0),expenseVat=expenses.reduce((s,e)=>s+expenseAmounts(e).vat,0),expenseHt=expenseTtc-expenseVat,resultHt=revenueHt-expenseHt,margin=revenueHt?resultHt/revenueHt*100:0;
   const unpaid=allPeriodExpenses.filter(e=>(e.status||'paid')==='unpaid').reduce((s,e)=>s+Number(e.amount||0),0);
   qs('#accountingStats').innerHTML=`<div class="stat"><span>CA TVAC</span><b class="accounting-amount positive">${money(revenueTtc)}</b></div><div class="stat"><span>CA HT</span><b>${money(revenueHt)}</b></div><div class="stat"><span>Dépenses TVAC</span><b class="accounting-amount negative">${money(expenseTtc)}</b></div><div class="stat"><span>Dépenses HT</span><b>${money(expenseHt)}</b></div><div class="stat"><span>Résultat HT estimé</span><b class="accounting-amount ${resultHt>=0?'positive':'negative'}">${money(resultHt)}</b><small>${margin.toFixed(1)} % du CA HT</small></div><div class="stat"><span>À payer</span><b class="${unpaid?'accounting-amount negative':''}">${money(unpaid)}</b></div>`;
-  const pm={card:0,cash:0,meal:0};payments.forEach(p=>pm[p.method]=(pm[p.method]||0)+Number(p.total||0));
+  const pm={card:0,cash:0,meal:0};payments.forEach(p=>pm[p.method]=(pm[p.method]||0)+(p.method==='cash'?effectivePaidAmount(p):Number(p.total||0)));
   qs('#accountingRevenue').innerHTML=`<h3>Ventes</h3><div class="accounting-kpi-list"><div><span>Nombre de tickets</span><b>${payments.length}</b></div><div><span>Ticket moyen</span><b>${money(payments.length?revenueTtc/payments.length:0)}</b></div><div><span>TVA collectée</span><b>${money(vatSales)}</b></div><div><span>CA HT</span><b>${money(revenueHt)}</b></div></div>`;
   qs('#accountingPayments').innerHTML=`<h3>Moyens de paiement</h3><div class="payment-breakdown"><div><span>💳 Carte</span><b>${money(pm.card)}</b></div><div><span>💶 Espèces</span><b>${money(pm.cash)}</b></div><div><span>🍽️ Chèque-repas</span><b>${money(pm.meal)}</b></div></div>`;
   const purchaseVat={6:{ht:0,vat:0,ttc:0},12:{ht:0,vat:0,ttc:0},21:{ht:0,vat:0,ttc:0}};expenses.forEach(e=>{const r=Number(e.vat||0),a=expenseAmounts(e);if(purchaseVat[r]){purchaseVat[r].ht+=a.ht;purchaseVat[r].vat+=a.vat;purchaseVat[r].ttc+=a.ttc}});
@@ -1025,13 +1050,13 @@ function personnelForm(u=null){
   const x=u||{},clientId=Number(x.clientId||currentEstablishment()?.clientId||0);
   const ests=(state.establishments||[]).filter(e=>Number(e.clientId)===clientId&&e.active!==false);
   const selected=new Set((Array.isArray(x.establishmentIds)&&x.establishmentIds.length?x.establishmentIds:[state.currentEstablishmentId]).map(Number));
-  return `<div class="form-grid"><label class="span2">Nom affiché<input id="personName" value="${esc(x.name||'')}" placeholder="Ex. Jean Dupont"></label><label>Identifiant<input id="personUsername" value="${esc(x.username||'')}" placeholder="Ex. jean"></label><label>E-mail<input id="personEmail" type="email" value="${esc(x.email||'')}" placeholder="nom@restaurant.be"></label><label>Rôle<select id="personRole"><option value="server" ${x.role==='server'||!x.role?'selected':''}>Serveur</option><option value="manager" ${x.role==='manager'?'selected':''}>Responsable</option><option value="admin" ${x.role==='admin'?'selected':''}>Administrateur</option></select></label><label class="span2">PIN ${u?'(laisser vide pour garder le PIN actuel)':''}<input id="personPin" type="password" inputmode="numeric" placeholder="Minimum 4 caractères"></label><label class="span2">Badge NFC / carte<input id="personNfcCode" value="${esc(x.nfcCode||'')}" placeholder="Ex. RP-ABC123"></label><div class="span3 nfc-config-actions"><button type="button" id="generatePersonnelNfc" class="secondary">🎫 Générer un code badge</button><button type="button" id="readPersonnelNfc" class="secondary">📡 Lire une carte NFC</button></div><div class="span3 establishment-access-box"><b>Établissements autorisés</b>${ests.map(e=>`<label class="checkline"><input type="checkbox" class="personEstablishmentAccess" value="${e.id}" ${selected.has(Number(e.id))?'checked':''}> ${esc(e.name)}</label>`).join('')||'<div class="muted">Aucun établissement</div>'}</div><button id="${u?'savePersonnelEdit':'savePersonnelCreate'}" ${u?`data-id="${u.id}"`:''} class="primary span3">${u?'Enregistrer':'Créer le compte'}</button></div>`;
+  return `<div class="form-grid"><label class="span2">Nom affiché<input id="personName" value="${esc(x.name||'')}" placeholder="Ex. Jean Dupont"></label><label>Identifiant<input id="personUsername" value="${esc(x.username||'')}" placeholder="Ex. jean"></label><label>E-mail<input id="personEmail" type="email" value="${esc(x.email||'')}" placeholder="nom@restaurant.be"></label><label>NISS (production SCE)<input id="personNiss" inputmode="numeric" maxlength="11" value="${esc(x.niss||'')}" placeholder="11 chiffres"></label><label>Rôle<select id="personRole"><option value="server" ${x.role==='server'||!x.role?'selected':''}>Serveur</option><option value="manager" ${x.role==='manager'?'selected':''}>Responsable</option><option value="admin" ${x.role==='admin'?'selected':''}>Administrateur</option></select></label><label class="span2">PIN ${u?'(laisser vide pour garder le PIN actuel)':''}<input id="personPin" type="password" inputmode="numeric" placeholder="Minimum 4 caractères"></label><label class="span2">Badge NFC / carte<input id="personNfcCode" value="${esc(x.nfcCode||'')}" placeholder="Ex. RP-ABC123"></label><div class="span3 nfc-config-actions"><button type="button" id="generatePersonnelNfc" class="secondary">🎫 Générer un code badge</button><button type="button" id="readPersonnelNfc" class="secondary">📡 Lire une carte NFC</button></div><div class="span3 establishment-access-box"><b>Établissements autorisés</b>${ests.map(e=>`<label class="checkline"><input type="checkbox" class="personEstablishmentAccess" value="${e.id}" ${selected.has(Number(e.id))?'checked':''}> ${esc(e.name)}</label>`).join('')||'<div class="muted">Aucun établissement</div>'}</div><button id="${u?'savePersonnelEdit':'savePersonnelCreate'}" ${u?`data-id="${u.id}"`:''} class="primary span3">${u?'Enregistrer':'Créer le compte'}</button></div>`;
 }
 function renderPersonnel(){
   const list=qs('#personnelList');if(!list)return;
   const clientId=Number(currentEstablishment()?.clientId||0);
   const users=state.users.filter(u=>u.role!=='superadmin'&&Number(u.clientId||clientId)===clientId);
-  list.innerHTML=users.map(u=>`<div class="personnel-row ${u.active===false?'inactive':''}"><div><b>${esc(u.name)}</b><div class="muted">${esc(u.username)}${u.email?' · '+esc(u.email):''} · ${roleLabel(u.role)}${u.nfcCode?' · Badge '+esc(u.nfcCode):''}</div></div><div><span class="status-pill ${u.active===false?'off':'on'}">${u.active===false?'Désactivé':'Actif'}</span></div><div class="personnel-actions"><button class="secondary editPersonnel" data-id="${u.id}">Modifier / PIN</button>${u.active===false?`<button class="primary reactivatePersonnel" data-id="${u.id}">Réactiver</button>`:`<button class="dangerbtn deactivatePersonnel" data-id="${u.id}">Désactiver</button>`}</div></div>`).join('');
+  list.innerHTML=users.map(u=>`<div class="personnel-row ${u.active===false?'inactive':''}"><div><b>${esc(u.name)}</b><div class="muted">${esc(u.username)}${u.email?' · '+esc(u.email):''} · ${roleLabel(u.role)}${u.niss?` · NISS •••${esc(String(u.niss).slice(-4))}`:' · NISS manquant'}${u.nfcCode?' · Badge '+esc(u.nfcCode):''}</div></div><div><span class="status-pill ${u.active===false?'off':'on'}">${u.active===false?'Désactivé':'Actif'}</span></div><div class="personnel-actions"><button class="secondary editPersonnel" data-id="${u.id}">Modifier / PIN</button>${u.active===false?`<button class="primary reactivatePersonnel" data-id="${u.id}">Réactiver</button>`:`<button class="dangerbtn deactivatePersonnel" data-id="${u.id}">Désactiver</button>`}</div></div>`).join('');
   const select=qs('#autoLockMinutes');if(select)select.value=String(Number(state.settings.autoLockMinutes||0));
 }
 function countActiveAdmins(exceptId=null){const clientId=Number(currentEstablishment()?.clientId||0);return state.users.filter(u=>u.active!==false&&u.role==='admin'&&Number(u.clientId)===clientId&&Number(u.id)!==Number(exceptId)).length}
@@ -1063,6 +1088,85 @@ function renderSuperAdmin(){
   qs('#clientsAdminList').innerHTML=clients.map(c=>{const ce=ests.filter(e=>Number(e.clientId)===Number(c.id)),clientRevenue=ce.reduce((sum,e)=>sum+establishmentSalesTotal(e.id),0);return `<div class="sa-client-card ${c.active===false?'inactive':''}"><div class="sa-client-head"><div><h3>${esc(c.name)}</h3><div class="muted">${esc(c.companyName||'')} ${c.vatNumber?'· '+esc(c.vatNumber):''} · CA ${money(clientRevenue)}</div></div><div class="personnel-actions"><button class="secondary editClient" data-id="${c.id}">Modifier</button><button class="primary addEstablishmentForClient" data-id="${c.id}">+ Établissement</button></div></div><div class="sa-est-grid">${ce.map(e=>{const st=licenseEffectiveStatus(e),sales=establishmentSalesTotal(e.id);return `<div class="sa-est-card"><div><b>${esc(e.name)}</b><div class="muted">${planLabel(e.plan)} · ${esc(e.address||'Adresse non renseignée')}${e.email?' · '+esc(e.email):''}</div><div class="muted">Admin : ${esc(primaryAdminForEstablishment(e)?.email||primaryAdminForEstablishment(e)?.username||'à configurer')}</div><div class="muted">CA démo : <b>${money(sales)}</b>${e.licenseEnd?` · fin ${esc(e.licenseEnd)}`:''}</div></div><span class="status-pill ${st==='active'?'on':'off'}">${st==='active'?'Active':st==='expired'?'Expirée':'Suspendue'}</span><div class="sa-est-actions"><button class="secondary openEstablishment" data-id="${e.id}">Ouvrir</button><button class="secondary testEstablishmentAccess" data-id="${e.id}">🧪 Tester accès</button><button class="secondary copyEstablishmentLink" data-id="${e.id}">🔗 Lien caisse</button><button class="secondary editEstablishment" data-id="${e.id}">Modifier</button><button class="${st==='active'?'dangerbtn':'primary'} toggleEstablishmentLicense" data-id="${e.id}">${st==='active'?'Suspendre':'Activer'}</button></div></div>`}).join('')||'<div class="empty">Aucun établissement</div>'}</div></div>`}).join('')||'<div class="empty">Aucun client</div>';
 }
 
+
+// ===== v2.35 : préparation SCE 2.0 Belgique (pré-certification) =====
+function fiscalEnsure(){
+  state.fiscalEvents=Array.isArray(state.fiscalEvents)?state.fiscalEvents:[];
+  state.fiscalCounters=state.fiscalCounters&&typeof state.fiscalCounters==='object'?state.fiscalCounters:{};
+  state.nextFiscalTicketNo=Math.max(1,Number(state.nextFiscalTicketNo||1));
+  if(!state.bookingPeriodId)state.bookingPeriodId=makeUuid();
+  if(!state.fiscalBookingDate)state.fiscalBookingDate=localDateISO();
+}
+function fiscalConfig(){return state.settings||{}}
+function fiscalEmployeeId(user=state.user){
+  const acc=state.users.find(u=>Number(u.id)===Number(user?.id))||user;
+  return validNiss(acc?.niss)?normalizeNiss(acc.niss):null;
+}
+function departmentIdFor(cat){return `DEP-${String(cat||'GENERAL').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'GENERAL'}`}
+function fiscalTransactionFromItems(items=[]){
+  const lines=(items||[]).map(i=>{
+    const lineTotal=Number((Number(i.price||0)*Number(i.qty||0)).toFixed(2));
+    return {lineType:'SINGLE_PRODUCT',mainProduct:{productId:String(i.id),productName:String(i.name||''),departmentId:departmentIdFor(i.cat||i.service||'GENERAL'),departmentName:String(i.cat||i.service||'Général'),quantity:Number(i.qty||0),quantityType:'PIECE',unitPrice:Number(Number(i.price||0).toFixed(4)),vats:[{label:vatLabelFromRate(i.vat),price:lineTotal,priceChanges:[]}]},subProducts:null,lineTotal};
+  });
+  return {transactionLines:lines,transactionTotal:Number(lines.reduce((a,l)=>a+l.lineTotal,0).toFixed(2))};
+}
+function fiscalFinancialLines(method,total,rounding=0){
+  const type=paymentTypeFor(method),name=method==='cash'?'Espèces':method==='meal'?'Chèque-repas':'Carte';
+  const rows=[{id:`PAY-${String(method||'other').toUpperCase()}`,name,type,inputMethod:'MANUAL',amount:Number(Number(total||0).toFixed(2)),amountType:'PAYMENT'}];
+  if(Math.abs(Number(rounding||0))>=0.005)rows.push({id:`ROUND-${String(method||'other').toUpperCase()}`,name,type,inputMethod:'MANUAL',amount:Number(Number(rounding).toFixed(2)),amountType:'ROUNDING'});
+  return rows;
+}
+function fiscalBasePayload(posFiscalTicketNo,employeeId=null){
+  fiscalEnsure();const c=fiscalConfig();
+  return {language:'FR',ticketMedium:c.sceTicketMedium||'PAPER',posId:String(c.scePosId||'UNASSIGNED'),posFiscalTicketNo:Number(posFiscalTicketNo),posSwVersion:String(c.scePosSwVersion||'2.35.0'),terminalId:String(c.sceTerminalId||'POS-1'),deviceId:String(c.sceDeviceId||'WEB-1'),posDateTime:localRfc3339(),bookingPeriodId:String(state.bookingPeriodId),bookingDate:String(state.fiscalBookingDate||localDateISO()),vatNo:String(c.sceVatNo||''),estNo:String(c.sceEstNo||''),employeeId:employeeId||fiscalEmployeeId()};
+}
+function recordFiscalEvent(label,mutation,data={},meta={}){
+  fiscalEnsure();const ticketNo=state.nextFiscalTicketNo++,labelCounter=(Number(state.fiscalCounters[label]||0)+1);state.fiscalCounters[label]=labelCounter;
+  const payload={...fiscalBasePayload(ticketNo,meta.employeeId||null),...data};
+  const missing=[];if(!/^.{14}$/.test(String(payload.posId||''))||payload.posId==='UNASSIGNED')missing.push('posId');if(!payload.vatNo)missing.push('vatNo');if(!payload.estNo)missing.push('estNo');if(!payload.employeeId)missing.push('employeeId/NISS');
+  const entry={id:`SIM-${Date.now()}-${state.fiscalEvents.length+1}`,createdAt:new Date().toISOString(),label,mutation,labelCounter,totalCounter:state.fiscalEvents.length+1,posFiscalTicketNo:ticketNo,status:'SIMULATED_UNSIGNED',missing,payload,response:null,note:meta.note||''};
+  state.fiscalEvents.push(entry);return entry;
+}
+function fiscalReadinessItems(){
+  const c=fiscalConfig(),est=currentEstablishment(),users=(state.users||[]).filter(u=>u.active!==false&&u.role!=='superadmin'&&userCanUseEstablishment(u,est)),products=state.products||[];
+  return [
+    {ok:/^BE\d{10}$/.test(String(c.sceVatNo||'').replace(/[.\s]/g,'')),label:'N° TVA belge configuré',detail:c.sceVatNo||'manquant'},
+    {ok:Boolean(String(c.sceEstNo||'').trim()),label:'N° établissement configuré',detail:c.sceEstNo||'manquant'},
+    {ok:/^[A-Z0-9]{14}$/.test(String(c.scePosId||'')),label:'POS ID SCE (14 caractères)',detail:c.scePosId||'attribué après certification'},
+    {ok:Boolean(String(c.sceTerminalId||'').trim())&&Boolean(String(c.sceDeviceId||'').trim()),label:'Terminal ID + Device ID',detail:`${c.sceTerminalId||'—'} / ${c.sceDeviceId||'—'}`},
+    {ok:users.length>0&&users.every(u=>validNiss(u.niss)),label:'NISS des utilisateurs actifs',detail:`${users.filter(u=>validNiss(u.niss)).length}/${users.length} complets`},
+    {ok:products.length>0&&products.every(p=>[0,6,12,21].includes(Number(p.vat))&&p.id&&p.name&&p.cat),label:'Produits + codes TVA A/B/C/D',detail:`${products.length} produit(s)`},
+    {ok:false,label:'Chronologie fiscale brute non consolidée',detail:'à séparer du regroupement visuel du ticket avant certification'},
+    {ok:c.sceCashRounding!==false,label:'Arrondi espèces à 0,05 €',detail:c.sceCashRounding!==false?'activé':'désactivé'},
+    {ok:Boolean(String(c.sceFdmUrl||'').trim()),label:'Adresse FDM / GraphQL configurée',detail:c.sceFdmUrl||'manquante'},
+    {ok:Boolean(String(c.scePosCertificateNo||'').trim()),label:'Certificat officiel POS',detail:c.scePosCertificateNo||'non obtenu'},
+    {ok:Boolean(String(c.sceFdmCertificateNo||'').trim()),label:'FDM certifié choisi',detail:c.sceFdmCertificateNo||'non configuré'},
+    {ok:false,label:'Event S — présence du personnel',detail:'fonction S à relier au pointage / présence avant certification'},
+    {ok:false,label:'Connexion FDM réelle et signature',detail:'à développer sur backend/terminal'},
+    {ok:false,label:'Stockage fiscal sécurisé et inaltérable',detail:'localStorage démo non conforme'},
+    {ok:false,label:'Certification SPF Finances réussie',detail:'demande officielle à introduire'}
+  ];
+}
+function renderSce(){
+  fiscalEnsure();const c=fiscalConfig();
+  const fields={sceVatNo:c.sceVatNo||'',sceEstNo:c.sceEstNo||'',scePosId:c.scePosId||'',scePosSwVersion:c.scePosSwVersion||'2.35.0',sceTerminalId:c.sceTerminalId||'POS-1',sceDeviceId:c.sceDeviceId||'WEB-1',sceTicketMedium:c.sceTicketMedium||'PAPER',sceFdmUrl:c.sceFdmUrl||'',scePosCertificateNo:c.scePosCertificateNo||'',sceFdmCertificateNo:c.sceFdmCertificateNo||'',sceCashRounding:c.sceCashRounding!==false?'1':'0',sceRoundAllPayments:c.sceRoundAllPayments?'1':'0'};
+  Object.entries(fields).forEach(([id,v])=>{const el=qs('#'+id);if(el)el.value=String(v)});
+  const items=fiscalReadinessItems(),ok=items.filter(x=>x.ok).length,pct=Math.round(ok/items.length*100);
+  const stats=qs('#sceReadinessStats');if(stats)stats.innerHTML=`<div><b>${pct}%</b><span>préparation</span></div><div><b>${ok}/${items.length}</b><span>contrôles prêts</span></div><div><b>${state.fiscalEvents.length}</b><span>events simulés</span></div><div><b>NON</b><span>certifié SPF</span></div>`;
+  const top=qs('#sceTopStatus');if(top){top.textContent='PRÉ-CERTIFICATION · NON CERTIFIÉ';top.className='badge license-suspended'}
+  const count=qs('#sceChecklistCount');if(count)count.textContent=`${ok}/${items.length} point(s) prêts`;
+  const list=qs('#sceChecklist');if(list)list.innerHTML=items.map(x=>`<div class="sce-check-row ${x.ok?'ok':'ko'}"><span>${x.ok?'✅':'⛔'}</span><div><b>${esc(x.label)}</b><div class="muted">${esc(x.detail)}</div></div></div>`).join('');
+  const journal=qs('#sceEventJournal');if(journal)journal.innerHTML=[...(state.fiscalEvents||[])].reverse().slice(0,80).map(ev=>`<div class="admin-row sce-event-row"><div><b>${esc(ev.label)} · ${esc(ev.mutation)}</b><div class="muted">${esc(ev.createdAt)} · POS ticket ${ev.posFiscalTicketNo} · compteur ${ev.labelCounter}/${ev.totalCounter}</div></div><div><span class="status-pill off">NON SIGNÉ</span><div class="muted">${ev.missing?.length?'Manque : '+esc(ev.missing.join(', ')):'Payload prêt pour test'}</div></div><button class="secondary viewSceEvent" data-id="${esc(ev.id)}">JSON</button></div>`).join('')||'<div class="empty">Aucun événement simulé. Envoyez une commande ou faites un encaissement.</div>';
+}
+function saveSceSettings(){
+  const c=state.settings;c.sceVatNo=String(qs('#sceVatNo')?.value||'').toUpperCase().replace(/[.\s]/g,'');c.sceEstNo=String(qs('#sceEstNo')?.value||'').trim();c.scePosId=String(qs('#scePosId')?.value||'').trim().toUpperCase();c.scePosSwVersion=String(qs('#scePosSwVersion')?.value||'2.35.0').trim();c.sceTerminalId=String(qs('#sceTerminalId')?.value||'POS-1').trim();c.sceDeviceId=String(qs('#sceDeviceId')?.value||'WEB-1').trim();c.sceTicketMedium=String(qs('#sceTicketMedium')?.value||'PAPER');c.sceFdmUrl=String(qs('#sceFdmUrl')?.value||'').trim();c.scePosCertificateNo=String(qs('#scePosCertificateNo')?.value||'').trim().toUpperCase();c.sceFdmCertificateNo=String(qs('#sceFdmCertificateNo')?.value||'').trim().toUpperCase();c.sceCashRounding=qs('#sceCashRounding')?.value!=='0';c.sceRoundAllPayments=qs('#sceRoundAllPayments')?.value==='1';
+  if(c.sceVatNo&&!/^BE\d{10}$/.test(c.sceVatNo))return toast('N° TVA : format attendu BE + 10 chiffres');if(c.scePosId&&!/^[A-Z0-9]{14}$/.test(c.scePosId))return toast('POS ID : 14 caractères majuscules/chiffres');save();renderSce();toast('Configuration SCE enregistrée');
+}
+function exportFiscalJournal(){
+  fiscalEnsure();const payload={exportedAt:new Date().toISOString(),warning:'SIMULATION NON CERTIFIEE - AUCUNE SIGNATURE FDM',establishment:currentEstablishment(),settings:{sceVatNo:state.settings.sceVatNo,sceEstNo:state.settings.sceEstNo,scePosId:state.settings.scePosId,scePosSwVersion:state.settings.scePosSwVersion,sceTerminalId:state.settings.sceTerminalId,sceDeviceId:state.settings.sceDeviceId},events:state.fiscalEvents};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`restaurant-pro-sce-journal-${localDateISO()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function previewLastFiscalPayload(){const ev=[...(state.fiscalEvents||[])].reverse()[0];if(!ev)return toast('Aucun événement SCE simulé');modal(`Payload ${ev.label} · ${ev.mutation}`,`<div class="commercial-warning">Simulation uniquement — ce JSON n’a pas été envoyé ni signé par un FDM.</div><pre class="json-preview">${esc(JSON.stringify(ev,null,2))}</pre>`)}
 function renderSettings(){
   qs('#generalEstablishmentName').value=state.settings.establishmentName;
   renderPersonnel();renderRoomSettings();
@@ -1078,6 +1182,10 @@ qs('#addTableBtn').onclick=()=>modal('Ajouter une table',tableSettingsForm());
 
 document.addEventListener('click',e=>{
   if(e.target.id==='modalClose')closeModal();
+  if(e.target.id==='saveSceSettingsBtn')saveSceSettings();
+  if(e.target.id==='exportFiscalJournalBtn')exportFiscalJournal();
+  if(e.target.id==='previewScePayloadBtn')previewLastFiscalPayload();
+  if(e.target.classList.contains('viewSceEvent')){const ev=(state.fiscalEvents||[]).find(x=>x.id===e.target.dataset.id);if(ev)modal(`SCE ${ev.label} · ${ev.mutation}`,`<div class="commercial-warning">Simulation pré-certification — aucune signature FDM.</div><pre class="json-preview">${esc(JSON.stringify(ev,null,2))}</pre>`)}
   if(e.target.id==='generatePersonnelNfc'){const input=qs('#personNfcCode');if(input)input.value=generateNfcCode()}
   if(e.target.id==='readPersonnelNfc')scanRealNfc(true);
   if(e.target.classList.contains('demoNfcUser')){const account=state.users.find(u=>Number(u.id)===Number(e.target.dataset.id));if(account){closeModal();finishLogin(account,'NFC démo')}}
@@ -1147,9 +1255,10 @@ document.addEventListener('click',e=>{
   // ===== v2.24 : personnel, PIN et rôles =====
   if(e.target.id==='savePersonnelCreate'||e.target.id==='savePersonnelEdit'){
     if(!isAdmin())return toast('Accès administrateur requis');
-    const editing=e.target.id==='savePersonnelEdit',id=Number(e.target.dataset.id||0),name=qs('#personName')?.value.trim(),username=normalizeLogin(qs('#personUsername')?.value),email=normalizeLogin(qs('#personEmail')?.value),role=qs('#personRole')?.value,pin=String(qs('#personPin')?.value||''),nfcCode=normalizeNfcCode(qs('#personNfcCode')?.value||'');
+    const editing=e.target.id==='savePersonnelEdit',id=Number(e.target.dataset.id||0),name=qs('#personName')?.value.trim(),username=normalizeLogin(qs('#personUsername')?.value),email=normalizeLogin(qs('#personEmail')?.value),niss=normalizeNiss(qs('#personNiss')?.value),role=qs('#personRole')?.value,pin=String(qs('#personPin')?.value||''),nfcCode=normalizeNfcCode(qs('#personNfcCode')?.value||'');
     if(!name||!username)return toast('Nom et identifiant obligatoires');
     if(email&&!validEmail(email))return toast('Adresse e-mail invalide');
+    if(niss&&!validNiss(niss))return toast('NISS : 11 chiffres requis');
     if(!/^[a-z0-9._-]{2,30}$/.test(username))return toast('Identifiant : lettres, chiffres, point, tiret ou _');
     if(!['server','manager','admin'].includes(role))return toast('Rôle invalide');
     const establishmentIds=qsa('.personEstablishmentAccess:checked').map(x=>Number(x.value));if(!establishmentIds.length)return toast('Choisissez au moins un établissement');
@@ -1162,9 +1271,9 @@ document.addEventListener('click',e=>{
     if(editing){
       const u=state.users.find(v=>Number(v.id)===id);if(!u)return;
       if(u.role==='admin'&&role!=='admin'&&u.active!==false&&countActiveAdmins(id)<1)return toast('Il faut conserver au moins un administrateur actif');
-      Object.assign(u,{name,username,email,nfcCode,role,clientId,establishmentIds});if(pin){if(pin.length<4)return toast('PIN minimum 4 caractères');u.pin=pin}
+      Object.assign(u,{name,username,email,niss,nfcCode,role,clientId,establishmentIds});if(pin){if(pin.length<4)return toast('PIN minimum 4 caractères');u.pin=pin}
       if(Number(state.user?.id)===id)state.user=userSnapshot(u);
-    }else state.users.push({id:state.nextUserId++,name,username,email,role,pin,nfcCode:nfcCode||generateNfcCode(),active:true,clientId,establishmentIds});
+    }else state.users.push({id:state.nextUserId++,name,username,email,niss,role,pin,nfcCode:nfcCode||generateNfcCode(),active:true,clientId,establishmentIds});
     save();closeModal();renderPersonnel();applyRole();qs('#userBadge').textContent=`${state.user.name} · ${roleLabel(state.user.role)}`;toast(editing?'Utilisateur modifié':'Utilisateur créé');
   }
   if(e.target.classList.contains('editPersonnel')){const u=state.users.find(v=>Number(v.id)===Number(e.target.dataset.id));if(u)modal('Modifier utilisateur',personnelForm(u))}
@@ -1218,16 +1327,19 @@ document.addEventListener('click',e=>{
     if(state.reservations.some(r=>Number(r.tableId)===id&&!['cancelled','finished','no_show'].includes(r.status)))return toast('Impossible : réservation active sur cette table');
     if(confirm(`Supprimer ${t.name} ?`)){state.tables=state.tables.filter(v=>Number(v.id)!==id);if(Number(state.tableId)===id){state.tableId=null;state.cart=[];state.sent=false;state.dirty=false}save();renderRoomSettings();renderTables();renderContext();renderCart();toast('Table supprimée')}
   }
-  if(e.target.id==='confirmOpenCash'){const opening=Number(qs('#cashOpenAmount').value||0);state.cashOpen=true;state.cashOpening=opening;state.cashSessions=state.cashSessions||[];state.cashSessions.push({id:state.nextCashSessionId++,openedAt:new Date().toISOString(),openedBy:userSnapshot(state.user),opening,closedAt:null,countedClose:null,cashSales:0,cashExpenses:0,expectedClose:opening,difference:0});save();renderCash();closeModal();toast('Caisse ouverte')}
-  if(e.target.id==='confirmCloseCash'){if(!isManager())return toast('Fermeture de caisse réservée au responsable / administrateur');const counted=Number(qs('#cashCloseAmount').value||0),session=currentOpenCashSession();if(session){const t=cashSessionTotals(session);Object.assign(session,{closedAt:new Date().toISOString(),closedBy:userSnapshot(state.user),countedClose:counted,cashSales:t.cashSales,cashExpenses:t.cashExpenses,expectedClose:t.expected,difference:counted-t.expected})}state.cashOpen=false;state.cashOpening=0;save();renderCash();closeModal();if(qs('#page-accounting')&&!qs('#page-accounting').classList.contains('hidden'))renderAccounting();toast('Caisse fermée')}
+  if(e.target.id==='confirmOpenCash'){const opening=Number(qs('#cashOpenAmount').value||0);state.cashOpen=true;state.cashOpening=opening;state.bookingPeriodId=makeUuid();state.fiscalBookingDate=localDateISO();state.cashSessions=state.cashSessions||[];state.cashSessions.push({id:state.nextCashSessionId++,openedAt:new Date().toISOString(),openedBy:userSnapshot(state.user),opening,closedAt:null,countedClose:null,cashSales:0,cashExpenses:0,expectedClose:opening,difference:0,bookingPeriodId:state.bookingPeriodId});recordFiscalEvent('F','signMoneyInOut',{financials:[{id:'OPENING-CASH',name:'Fond de caisse',type:'CASH',inputMethod:'MANUAL',amount:Number(opening.toFixed(2)),amountType:'MONEY_IN_OUT'}]},{note:'Ouverture / fond de caisse simulé'});save();renderCash();closeModal();toast('Caisse ouverte')}
+  if(e.target.id==='confirmCloseCash'){if(!isManager())return toast('Fermeture de caisse réservée au responsable / administrateur');const counted=Number(qs('#cashCloseAmount').value||0),session=currentOpenCashSession();if(session){const t=cashSessionTotals(session);Object.assign(session,{closedAt:new Date().toISOString(),closedBy:userSnapshot(state.user),countedClose:counted,cashSales:t.cashSales,cashExpenses:t.cashExpenses,expectedClose:t.expected,difference:counted-t.expected});recordFiscalEvent('F','signMoneyInOut',{financials:[{id:'DRAWER-DECLARATION',name:'Comptage tiroir-caisse',type:'CASH',inputMethod:'MANUAL',amount:Number(counted.toFixed(2)),amountType:'DRAWER_DECLARATION'}]},{note:'Déclaration tiroir de fermeture simulée'})}state.cashOpen=false;state.cashOpening=0;save();renderCash();closeModal();if(qs('#page-accounting')&&!qs('#page-accounting').classList.contains('hidden'))renderAccounting();toast('Caisse fermée')}
   if(e.target.id==='confirmDayClose'){
     if(!isManager())return toast('Ticket Z réservé au responsable / administrateur');
     if(Object.keys(state.openOrders||{}).length)return toast('Il reste des commandes ouvertes');
     const x=dayClosurePreview(),counted=Number(qs('#dayCloseCounted')?.value||0),note=qs('#dayCloseNote')?.value.trim()||'',now=new Date().toISOString(),date=localDateISO(),zId=Number(state.nextDayClosureId||1);
     if(x.openSession)Object.assign(x.openSession,{closedAt:now,closedBy:userSnapshot(state.user),countedClose:counted,cashSales:x.pm.cash,cashExpenses:x.cashExpenses,expectedClose:x.expectedCash,difference:counted-x.expectedCash,zClosureId:zId});
     (x.cashExpenseRows||[]).forEach(exp=>exp.zClosureId=zId);
-    state.dayClosures=state.dayClosures||[];state.dayClosures.push({id:state.nextDayClosureId++,zNumber:zId,type:'Z',date,periodStart:x.periodStart||null,periodEnd:now,closedAt:now,closedBy:userSnapshot(state.user),ticketCount:x.payments.length,grossSales:x.ca,payments:{...x.pm},cashiers:structuredClone(x.cashiers),vat:x.vat,vatTotal:x.vatTotal,opening:x.opening,cashExpenses:x.cashExpenses,expectedCash:x.expectedCash,countedCash:counted,difference:counted-x.expectedCash,note});
-    state.cashOpen=false;state.cashOpening=0;state.cart=[];state.tableId=null;state.sent=false;state.dirty=false;save();renderAll();closeModal();if(qs('#page-accounting')&&!qs('#page-accounting').classList.contains('hidden'))renderAccounting();toast(`Ticket Z #${String(zId).padStart(4,'0')} clôturé · compteurs remis à zéro`);
+    if(x.openSession)recordFiscalEvent('F','signMoneyInOut',{financials:[{id:'DRAWER-DECLARATION',name:'Comptage tiroir-caisse',type:'CASH',inputMethod:'MANUAL',amount:Number(counted.toFixed(2)),amountType:'DRAWER_DECLARATION'}]},{note:'Déclaration tiroir lors du Ticket Z simulée'});
+    const rzTurnover=recordFiscalEvent('R','signReportTurnoverZ',{reportNo:zId,reportBookingDate:date,turnover:{ticketCount:x.payments.length,grossSales:Number(x.ca.toFixed(2)),payments:{...x.pm},vat:x.vat}},{note:'Ticket Z chiffre d’affaires simulé'});
+    const rzUsers=recordFiscalEvent('R','signReportUserZ',{reportNo:zId,reportBookingDate:date,users:x.cashiers.map(u=>({employeeId:(state.users.find(a=>Number(a.id)===Number(u.userId))?.niss||null),displayName:u.name,ticketCount:u.ticketCount,turnover:Number(u.total.toFixed(2))}))},{note:'Ticket Z utilisateurs simulé'});
+    state.dayClosures=state.dayClosures||[];state.dayClosures.push({id:state.nextDayClosureId++,zNumber:zId,type:'Z',date,periodStart:x.periodStart||null,periodEnd:now,closedAt:now,closedBy:userSnapshot(state.user),ticketCount:x.payments.length,grossSales:x.ca,payments:{...x.pm},cashiers:structuredClone(x.cashiers),vat:x.vat,vatTotal:x.vatTotal,opening:x.opening,cashExpenses:x.cashExpenses,expectedCash:x.expectedCash,countedCash:counted,difference:counted-x.expectedCash,note,fiscalEventIds:[rzTurnover.id,rzUsers.id]});
+    state.cashOpen=false;state.cashOpening=0;state.cart=[];state.tableId=null;state.sent=false;state.dirty=false;state.bookingPeriodId='';state.fiscalBookingDate='';save();renderAll();closeModal();if(qs('#page-accounting')&&!qs('#page-accounting').classList.contains('hidden'))renderAccounting();toast(`Ticket Z #${String(zId).padStart(4,'0')} clôturé · compteurs remis à zéro`);
   }
   if(e.target.id==='printXReport')window.print();
   if(e.target.classList.contains('viewDayClosure')){const c=(state.dayClosures||[]).find(x=>Number(x.id)===Number(e.target.dataset.id));if(c)modal('Détail de la clôture',dayClosureDetail(c))}

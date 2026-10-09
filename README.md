@@ -1,4 +1,38 @@
-# Restaurant Pro v2.34 — Recette du jour accessible au serveur
+# Restaurant Pro v2.35 — Préparation SCE 2.0 Belgique
+
+> ⚠️ **STATUT : PRÉ-CERTIFICATION / DÉMO — NON CERTIFIÉ SPF FINANCES.** Cette version ne doit pas être utilisée comme caisse fiscale SCE en production. Le mode actuel fonctionne sur GitHub Pages/localStorage et ne communique pas encore avec un FDM certifié.
+
+## Objectif v2.35
+
+Cette version prépare l'application à la certification belge **SCE 2.0** sans prétendre qu'elle est déjà certifiée. Elle ajoute une page **🛡️ SCE 2.0** par établissement avec configuration TVA/établissement/POS/terminal/device/FDM, contrôle de préparation et journal JSON simulé.
+
+Fonctions préparées dans le démo :
+- identification utilisateur avec champ NISS 11 chiffres (le NISS n'est pas imprimé sur le ticket) ;
+- codes TVA internes A=21 %, B=12 %, C=6 %, D=0 %, X=hors champ ;
+- events simulés **P** (commande/table), **N** (vente finale), **F** (mouvements/comptage caisse) et **R** (rapports X/Z) ;
+- compteurs d'events et numéro fiscal POS simulés ;
+- `bookingPeriodId`, `bookingDate`, `posId`, `terminalId`, `deviceId`, `employeeId` et autres champs préparatoires ;
+- arrondi espèces au multiple de 0,05 € avec ligne ROUNDING séparée ; les chèques-repas ne sont pas arrondis ;
+- export du journal fiscal simulé en JSON ;
+- Ticket X et Ticket Z intégrés au journal SCE simulé ;
+- ticket client de la démo explicitement marqué **NON FISCAL** tant qu'aucun FDM ne signe la vente.
+
+## Ce qui reste obligatoire avant de commercialiser Restaurant Pro comme SCE certifié
+
+1. Remplacer le stockage `localStorage` par un stockage serveur sécurisé et documenté, avec conservation des données originales POS + réponses FDM.
+2. Intégrer réellement un **FDM SCE 2.0 certifié** via le protocole/API GraphQL officiel.
+3. Bloquer techniquement toute finalisation d'une vente lorsque le FDM n'est pas connecté et opérationnel, et attendre sa signature avant le ticket TVA.
+4. Imprimer/produire le ticket TVA avec les données de contrôle et le QR reçus/produits à partir de la réponse FDM.
+5. Finaliser les events S (présence du personnel), C (copies), I (factures) et les scénarios de correction/remboursement conformément aux Use Cases officiels.
+6. Préparer le dossier technique, la description de la base de données et les mécanismes de sécurité, puis passer la **certification officielle SPF Finances**.
+7. Pour les factures B2B/B2G concernées, intégrer la facturation électronique structurée/Peppol.
+
+Documentation officielle à suivre pendant le développement :
+- https://www.systemedecaisseenregistreuse.be/fr/sce-20-0
+- https://www.systemedecaisseenregistreuse.be/fr/systemes-certifies/sce-2-0
+- contact technique SPF SCE : secr.gksce@minfin.fed.be
+
+---
 
 ## Nouveautés v2.34
 
